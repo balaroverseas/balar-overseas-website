@@ -171,24 +171,31 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .curve.glow{overflow:visible;box-shadow:0 -30px 80px -10px rgba(59,44,255,.75),0 -6px 24px rgba(90,70,255,.9)}
 
 /* ---------- Ship ---------- */
-.ship{position:relative;height:700vh;background:#071d57}
+.ship{position:relative;height:850vh;background:#071d57}
 .ship-sticky{position:sticky;top:0;height:100vh;height:100svh;overflow:hidden;color:#fff}
 #shipCanvas{position:absolute;inset:0;width:100%;height:100%;display:block;background:#0a2466}
-.why-title{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;z-index:2;pointer-events:none}
+/* title + cards scroll up over the ship as one block in the last third (reference: 2 columns
+   flanking the ship, left one right-aligned, the fifth card centred) */
+.why-flow{position:absolute;left:0;right:0;top:0;z-index:2;pointer-events:none;will-change:transform}
+.why-title{width:min(35vw,560px);min-width:280px;margin:0 auto;text-align:center}
 .why-title .mono{margin-bottom:14px}
-.why-title h2{font-size:clamp(34px,4.4vw,70px);text-shadow:0 4px 40px rgba(0,0,30,.45)}
-.why-cards{position:absolute;inset:0;z-index:2;pointer-events:none}
-.why-card{position:absolute;width:min(300px,30vw);text-align:center;opacity:0;will-change:transform,opacity;text-shadow:0 2px 18px rgba(0,8,40,.85)}
+.why-title h2{font-size:clamp(30px,4.17vw,80px);line-height:1.05;text-shadow:0 4px 40px rgba(0,0,30,.45)}
+.why-cards{display:grid;grid-template-columns:18.6vw 18.6vw;column-gap:12vw;row-gap:7vw;justify-content:center;margin-top:26vw}
+.why-card{text-shadow:0 2px 18px rgba(0,8,40,.85)}
+.why-card:nth-child(odd){text-align:right}.why-card:nth-child(even){text-align:left}
+.why-card:last-child{grid-column:1/-1;justify-self:center;width:18.6vw;text-align:center}
 .why-card svg{width:40px;height:40px;fill:none;stroke:#fff;stroke-width:1.4;margin-bottom:12px}
-.why-card h3{font-family:var(--display);font-stretch:125%;font-weight:700;text-transform:uppercase;font-size:clamp(20px,1.9vw,28px);line-height:.95;margin-bottom:12px}
-.why-card p{font-size:14px;color:#dfe6ff}
+.why-card h3{font-family:var(--display);font-stretch:125%;font-weight:700;text-transform:uppercase;font-size:clamp(16px,1.39vw,26px);line-height:1.1;margin-bottom:12px}
+.why-card p{font-size:clamp(12px,.93vw,16px);color:#dfe6ff}
 .veil{position:absolute;inset:0;background:#fff;opacity:0;z-index:3;pointer-events:none}
 
 /* ---------- Testimonials + plane ---------- */
 .testi{position:relative;background:#fff;padding-bottom:120px}
-/* fixed overlay: the jet flies over the ship's clouds and on over the white testimonials */
-.plane-stage{position:fixed;inset:0;z-index:6;pointer-events:none;visibility:hidden}
-.plane-stage canvas{width:100%;height:100%;display:block}
+/* like the reference: one huge top-down jet (nose right) rides in with the white section,
+   overlapping the ship's clouds, then stays pinned mid-screen while the testimonials pass under it */
+.plane-stage{position:sticky;top:20vh;height:60vh;margin-bottom:-60vh;z-index:6;pointer-events:none}
+.plane-stage img{position:absolute;left:0;top:50%;width:100%;height:auto;transform:translateY(-50%);filter:drop-shadow(3vw 4.5vw 2.2vw rgba(0,0,0,.2))}
+
 .testi-head{padding-top:60vh;display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:end;margin-bottom:80px}
 .testi-head h2{font-size:clamp(36px,4.6vw,72px)}
 .testi-head p{max-width:380px;justify-self:end}
@@ -319,7 +326,7 @@ footer{background:#fff;padding-top:3vw;overflow:hidden}
   .j-rel{flex-direction:column;align-items:stretch;justify-content:space-between;padding-top:100px}
   .j-rel-left{background:rgba(255,255,255,.88);padding:14px;margin:0 -14px}
   .j-rel-right{width:auto;height:190px;background:rgba(255,255,255,.88);padding:14px;margin:0 -14px}
-  .why-card{width:min(260px,70vw)}
+  .why-cards{grid-template-columns:1fr;margin-top:40vh;row-gap:10vh}.why-card,.why-card:last-child{width:auto;text-align:center!important;grid-column:auto}
   .t-row{grid-template-columns:1fr;gap:20px}
   .t-av{width:140px;font-size:40px}
   .testi-head p{justify-self:start}
@@ -350,10 +357,10 @@ footer{background:#fff;padding-top:3vw;overflow:hidden}
 .ph-bg{position:absolute;inset:0;background-size:cover;background-position:center;transform:scale(1.12);will-change:transform}
 .ph-bg::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.55) 0%,rgba(0,0,0,.15) 40%,rgba(0,0,0,.75) 100%)}
 .ph-canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
-.ph-inner{position:relative;z-index:2;width:100%;display:grid;grid-template-columns:1.4fr 1fr;gap:40px;align-items:end}
-.ph-kicker{font-family:var(--display);font-stretch:125%;font-weight:600;text-transform:uppercase;font-size:clamp(14px,1.3vw,19px);margin-bottom:12px}
-.ph-title{font-size:clamp(44px,7.2vw,120px)}
-.ph-side{max-width:340px;justify-self:end;font-size:clamp(15px,1.25vw,18px);line-height:1.35}
+.ph-inner{position:relative;z-index:2;width:100%;display:grid;grid-template-columns:1fr 24.2vw;gap:40px;align-items:end}
+.ph-kicker{font-family:var(--display);font-stretch:125%;font-weight:600;text-transform:uppercase;font-size:clamp(13px,1.16vw,22px);margin-bottom:.6vw}
+.ph-title{font-size:clamp(40px,5.56vw,110px);line-height:1.05}
+.ph-side{max-width:24.2vw;min-width:240px;justify-self:end;font-size:clamp(13px,1.16vw,20px);line-height:1.2}
 .ph-crumb{position:absolute;top:120px;left:var(--pad);z-index:2;color:#9a9ab0}
 .ph-crumb a{color:#fff}
 .sec{padding:clamp(80px,11vw,150px) 0;position:relative;background:#fff}
@@ -363,7 +370,7 @@ footer{background:#fff;padding-top:3vw;overflow:hidden}
 .sec-dark .sec-label{color:#8a8a8a}
 .h-xl{font-size:clamp(40px,5.6vw,92px)}
 .h-lg{font-size:clamp(34px,4.4vw,70px)}
-.lead{font-weight:500;font-size:clamp(22px,2.3vw,34px);line-height:1.22;letter-spacing:-.01em}
+.lead{font-weight:500;font-size:clamp(17px,1.5vw,28px);line-height:1.2;letter-spacing:-.01em}
 .reveal-words .rw{color:#d2d2d2;transition:color .25s}
 .reveal-words .rw.on{color:#000}
 .sec-dark .reveal-words .rw{color:#444}
@@ -375,7 +382,7 @@ footer{background:#fff;padding-top:3vw;overflow:hidden}
 
 /* ---------- About ---------- */
 .story{display:grid;grid-template-columns:1fr 1fr;gap:clamp(30px,6vw,100px)}
-.story-text{position:sticky;top:18vh;align-self:start}
+.story-text{position:sticky;top:18vh;align-self:start;max-width:max(30vw,320px)}
 .story-imgs{display:flex;flex-direction:column;gap:22vh;padding-top:10vh}
 .story-imgs img{width:min(420px,100%);aspect-ratio:4/3;object-fit:cover;background:#f2f2f2}
 .story-imgs img:nth-child(even){align-self:flex-end}

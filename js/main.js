@@ -135,76 +135,40 @@ function setupJourney(journey) {
 // ---------------------------------------------------------------- ship overlays
 function setupShip(ship) {
   const sec = $('#why');
-  const title = $('#whyTitle'), veil = $('#shipVeil');
-  const cards = $$('.why-card');
-  const layout = () => {
-    const mob = innerWidth < 900;
-    cards.forEach((c, i) => {
-      const left = i % 2 === 0;
-      c.style.left = mob ? `calc(50% - ${c.offsetWidth / 2}px)` : left ? '8vw' : 'auto';
-      c.style.right = !mob && !left ? '8vw' : 'auto';
-      c.style.top = '50%';
-    });
-  };
-  layout();
-  addEventListener('resize', layout);
+  const flow = $('#whyFlow'), title = $('#whyTitle');
+  // Like the reference: no text for the first ~65% (just the ship), then the title + 2-column
+  // cards scroll up over it as one block at ~0.88× page speed (title centred at S≈0.7).
   ScrollTrigger.create({
     trigger: sec, start: 'top top', end: 'bottom bottom',
     onUpdate: (s) => {
       const S = s.progress;
       ship && ship.setProgress(S);
-      title.style.opacity = 1 - range(S, 0.1, 0.16);
-      title.style.transform = `translateY(${-range(S, 0.06, 0.16) * 120}px)`;
-      cards.forEach((c, i) => {
-        const a = 0.14 + i * 0.105, t = range(S, a, a + 0.24);
-        const y = (1 - t * 2) * innerHeight * 0.55;
-        c.style.transform = `translateY(calc(-50% + ${y}px))`;
-        c.style.opacity = Math.min(1, Math.sin(t * Math.PI) * 2.2);
-      });
-      veil.style.opacity = range(S, 0.9, 1);
-      sec.dataset.dynTheme = S > 0.93 ? 'light' : 'dark';
+      const range = sec.offsetHeight - innerHeight;
+      const titleMid = 0.5 * innerHeight - 0.5 * title.offsetHeight;   // title centred at S = 0.7
+      const y = titleMid - (S - 0.7) * range * 0.88;
+      flow.style.transform = `translate3d(0,${Math.min(y, innerHeight + 10)}px,0)`;
+      sec.dataset.dynTheme = 'dark';
     },
   });
 }
 
-// ---------------------------------------------------------------- plane + arc
-function setupPlane(plane) {
-  if (!plane) return;
-  const stage = $('.plane-stage'), why = $('#why'), testi = $('#testimonials');
-  const pageTop = (el) => el.getBoundingClientRect().top + scrollY;
-  // from the cloudy end of the ship climb until the testimonials are one screen in
-  ScrollTrigger.create({
-    start: () => pageTop(why) + why.offsetHeight - 2.1 * innerHeight,
-    end: () => pageTop(testi) + 0.9 * innerHeight,
-    invalidateOnRefresh: true,
-    onUpdate: (s) => plane.setProgress(s.progress),
-    onToggle: (s) => { stage.style.visibility = s.isActive ? 'visible' : 'hidden'; },
-  });
-}
-
+// ---------------------------------------------------------------- jet is a sticky still (CSS) — see .plane-stage
 // ---------------------------------------------------------------- boot
 async function boot() {
   await Promise.race([document.fonts.ready, wait(2500)]);
-  const [globe, journey, ship, plane] = await Promise.all([
+  const [globe, journey, ship] = await Promise.all([
     scene('globe', './scenes/globe.js', 'initGlobe', $('#globe'), $('#globeLabels')),
     scene('journey', './scenes/journey.js', 'initJourney', $('#journeyCanvas'), (v) => { $('#jSpeed').textContent = String(v).padStart(2, '0'); }),
     // ship: pre-rendered Blender sequence (top-down, climbs into the clouds)
     sequencePlayer($('#shipCanvas'), { dir: 'seq/ship', count: 200, fit: 'cover', lazy: true }),
-    // jet: pre-rendered Blender sequence on a transparent background
-    sequencePlayer($('#planeCanvas'), {
-      dir: 'seq/plane', count: 180, bleed: 0.6, lazy: true,
-      shadow: { dx: 0.07, dy: 0.1, blur: 14, alpha: 0.22 },   // soft grey shadow on the page, like the reference
-    }),
     plMapReady,
   ]);
 
   setupHero(globe);
   setupJourney(journey);
   setupShip(ship);
-  setupPlane(plane);
   // fetch the ship and jet frames a few screens before they are needed
   ScrollTrigger.create({ trigger: '#why', start: 'top 400%', once: true, onEnter: () => ship.load() });
-  ScrollTrigger.create({ trigger: '#why', start: 'top bottom', once: true, onEnter: () => plane.load() });
   setupCurves();
   setupReveals();
   setupFooter();

@@ -22,6 +22,7 @@ ap = argparse.ArgumentParser()
 ap.add_argument('--frames', default='1')
 ap.add_argument('--samples', type=int, default=32)
 ap.add_argument('--res', default='1600x900')
+ap.add_argument('--still', action='store_true', help='one big frame, nose pointing right, pinned over the testimonials like the reference')
 ap.add_argument('--bg', action='store_true', help='render the clouds/sea too (otherwise transparent, the page supplies the sky)')
 ap.add_argument('--out', default=os.path.join(os.path.dirname(__file__), '..', 'seq', 'plane'))
 args = ap.parse_args(argv)
@@ -152,6 +153,20 @@ def apply(f):
         c.location.y = -t * (900 - i * 150)      # clouds stream past underneath
 
 
+if args.still:
+    # the reference pins a single huge top-down jet over the testimonials: nose to the right,
+    # fuselage ~95% of the width (nose cut by the right edge), wingtips cut by top and bottom
+    W = 76.0
+    jet.location = (0, 0, 0)
+    jet.rotation_euler = (0, 0, -math.pi / 2)
+    cam.location = (-0.15 * W, 0, 220)
+    cam_data.lens = 36 * 220 / W
+    os.makedirs(args.out, exist_ok=True)
+    s.frame_set(1)
+    s.render.filepath = os.path.join(args.out, 'jet.webp')
+    bpy.ops.render.render(write_still=True)
+    print('RENDERED still', flush=True)
+    sys.exit(0)
 for f in range(1, LAST + 1):
     apply(f)
     jet.keyframe_insert('location', frame=f)
