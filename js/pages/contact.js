@@ -1,4 +1,5 @@
 import { $, $$, bootInnerPage } from '../common.js';
+import { drawDotMap } from '../fx/dotmap.js';
 
 const WHATSAPP = '919898977266';
 const EMAIL = 'balaroverseas@gmail.com';
@@ -38,4 +39,9 @@ function setupForm() {
   });
 }
 
-bootInnerPage(async () => { setupForm(); });
+bootInnerPage(async () => {
+  setupForm();
+  // dotted world map above the locations, like the reference
+  const map = $('#cMap');
+  if (map) drawDotMap(map, { gap: 6, dot: 2, color: '#cfcfcf', markers: [{ lat: 21.17, lon: 72.83, color: '#3b2cff' }, { lat: 23.13, lon: 113.26, color: '#3b2cff' }] }).catch(() => {});
+});
