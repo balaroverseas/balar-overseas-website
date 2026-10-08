@@ -181,7 +181,7 @@ export function buildWheel(r, width, rimColor = '#d9d9d9') {
 }
 
 // ---------- Semi truck (faces +X, ~16 units long) ----------
-export function buildTruck({ cab = '#121212', trim = '#e3cab6', container = null } = {}) {
+export function buildTruck({ cab = '#121212', trim = '#e3cab6', skirt = '#1b1b1b', container = null } = {}) {
   const truck = new THREE.Group();
   const paint = new THREE.MeshPhysicalMaterial({ color: cab, metalness: 0.5, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.12 });
   const dark = new THREE.MeshStandardMaterial({ color: '#1b1b1b', roughness: 0.85 });
@@ -217,8 +217,9 @@ export function buildTruck({ cab = '#121212', trim = '#e3cab6', container = null
   add(tank, chrome, 5.6, 1.2, -1.05);
   add(new THREE.BoxGeometry(12.6, 0.3, 2.45), dark, -1.1, 1.45, 0); // trailer bed
   // side skirts between the axle groups
+  const skirtMat = new THREE.MeshPhysicalMaterial({ color: skirt, metalness: 0.3, roughness: 0.35, clearcoat: 1 });
   [1.24, -1.24].forEach((z) => {
-    add(new THREE.BoxGeometry(7.3, 1.15, 0.06), dark, -0.7, 0.85, z);   // trailer side skirt
+    add(new THREE.BoxGeometry(7.3, 1.15, 0.06), skirtMat, -0.7, 0.85, z);   // trailer side skirt
     add(new THREE.BoxGeometry(1.0, 0.75, 0.06), dark, 5.75, 0.6, z);   // step box between axles
   });
   add(new THREE.BoxGeometry(0.08, 0.2, 0.4), tail, -7.42, 1.35, 1.0);

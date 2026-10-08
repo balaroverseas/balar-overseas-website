@@ -221,10 +221,11 @@ export function initJourney(canvas, onSpeed) {
   scene.add(rs.group);
   const spreader = buildSpreader();
   scene.add(spreader);
-  const box = makeContainer('#e2e2e2', { label: 'BALAR OVERSEAS', labelColor: '#2a2a2a' });
+  const box = makeContainer('#c4c9cf', { label: 'BALAR OVERSEAS', labelColor: '#1e2328' });
   scene.add(box);
 
-  const truck = buildTruck({ cab: '#141414' });
+  // same livery as the Blender truck the sequence hands over from
+  const truck = buildTruck({ cab: '#eef0f3', trim: '#3b2cff', skirt: '#3b2cff' });
   scene.add(truck);
 
   // ---------- helpers
@@ -238,6 +239,16 @@ export function initJourney(canvas, onSpeed) {
     const f = frame(tx + 0.3, 0, 14.5);
     f.y = 2.5 - 0.5 * f.h;   // truck sits in the upper part of the screen
     return f;
+  };
+  // Same framing as the last Blender frame on the page (see main.js: 1440px frames, 30 m wide,
+  // ground line pinned at 90% of the screen, camera trailing the truck by 5.2 m), so the
+  // hand-over from the image sequence to this live scene is invisible.
+  const seqFrame = (tx) => {
+    const W = innerWidth, H = innerHeight;
+    const sc = Math.min((W * 1.15) / 1440, H / 810);
+    const mpp = 30 / (1440 * sc);              // metres per CSS pixel
+    const h = 0.5 * H * mpp;
+    return { x: tx - 5.2, y: 0.4 * H * mpp, h, D: h / tanH };
   };
   // The truck keeps to its own (right-hand) lane: +Z while heading +X, -X while heading +Z.
   const LANE = 2.25;
@@ -307,7 +318,8 @@ export function initJourney(canvas, onSpeed) {
 
     // reach stacker stays in the port; it is simply left behind once the truck drives off
     const inPort = P < A_END + 0.1;
-    rs.group.visible = spreader.visible = stackA.visible = stackB.visible = inPort;
+    rs.group.visible = spreader.visible = inPort;
+    stackA.visible = stackB.visible = P < A_END;   // the Blender sequence hides the stack after the orbit too
     white.visible = shadowCatcher.visible = P > B_END;
     if (inPort) {
       const tip = new THREE.Vector3(spreader.position.x, spreader.position.y + 1.9, ZS);
@@ -339,7 +351,8 @@ export function initJourney(canvas, onSpeed) {
       if (a > 0.6) f = mixF(f, low, seg(a, 0.6, 0.82));
       if (a > 0.85) f = mixF(f, sideTruckFrame(tx), toTruck);
     } else {
-      f = sideTruckFrame(tx);
+      // starts exactly where the pre-rendered sequence ends, then settles into the services framing
+      f = mixF(seqFrame(tx), sideTruckFrame(tx), seg(b, 0.03, 0.1));
     }
 
     const orbit = P >= B_END ? ease(range(c, 0, 0.22)) * (Math.PI / 2) : 0;

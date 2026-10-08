@@ -1,5 +1,7 @@
-"""Reach stacker lifts the Balar container off the stack, turns it and the camera
-zooms in (frames 1–150). Side view, transparent background, renders WebP frames.
+"""Reach stacker lifts the Balar container off the stack while the camera orbits to face
+it (frames 1–150), a truck rolls in underneath, the container is set down on the trailer
+and the truck pulls away (151–300). Transparent background, renders WebP frames plus
+meta.json (ground line per frame).
 
   blender -b -P stacker.py -- --frames 40          (one test frame)
   blender -b -P stacker.py -- --frames 1-150 --samples 64
@@ -122,12 +124,21 @@ box('headblock', (1.7, 1.4, 0.9), (0, 0, 1.45), paint_dark, bevel=0.1, parent=sp
 
 # ----------------------------------------------------------------------------- containers
 STACK_X = (7.6, 10.06)
-container('stack_blue', '#1f3c8f', loc=(STACK_X[0], 0, 0)).rotation_euler = (0, 0, math.pi / 2)
-container('stack_orange', '#d4632a', loc=(STACK_X[1], 0, 0)).rotation_euler = (0, 0, math.pi / 2)
+stack_roots = [container('stack_blue', '#1f3c8f', loc=(STACK_X[0], 0, 0)), container('stack_orange', '#d4632a', loc=(STACK_X[1], 0, 0))]
+for o in stack_roots:
+    o.rotation_euler = (0, 0, math.pi / 2)
+stack = [c for o in stack_roots for c in [o] + list(o.children_recursive)]   # hide_render is per object
 hero = container('hero', '#b9bec5', label='BALAR OVERSEAS', label_color='#1e2328')
 
+# truck drives in along +Y (screen left → right once the camera has orbited) under the container
+from truck import build_truck, DECK  # noqa: E402
+truck, truck_wheels = build_truck(loc=(4.6, -60, 0))
+truck.rotation_euler = (0, 0, math.pi / 2)
+truck_parts = [truck] + list(truck.children_recursive)
+
 lib.studio_light(sun_dir=(-55, 0, -32), strength=1.1, sky_strength=0.07)   # soft fill + rim
-lib.sun_toward((0.45, 0.55, -0.7), strength=2.2)                           # key light from the camera side
+key_a = lib.sun_toward((0.45, 0.55, -0.7), strength=2.2)                   # key light from the side camera
+key_b = lib.sun_toward((-0.55, 0.45, -0.7), strength=0.0)                  # key light once the camera has orbited
 # dark ground like the reference: seen almost edge-on it reads as a black band
 lib.shadow_floor()   # contact shadows only; the black ground band is drawn by the page (like the reference)
 
@@ -136,19 +147,51 @@ START = Vector(((STACK_X[0] + STACK_X[1]) / 2, 0, 2.59))
 LIFTED = Vector((4.6, 0, 7.6))
 
 
+TRUCK_IN = (151, 196)      # truck rolls in and stops under the container
+LOWER = (198, 232)         # container lowered onto the trailer
+RELEASE = (236, 258)       # spreader lets go and rises out of the way
+DRIVE = (260, 300)         # truck pulls away to the right, the camera follows it
+LAST = 300
+
+
 def pose(f):
     lift = seg(f, 15, 55)
     c = START.lerp(LIFTED, lift)
     c.z += math.sin(lift * math.pi) * 0.6               # slight arc while lifting
+    c.z = lerp(c.z, DECK, seg(f, *LOWER))
     return c, math.pi / 2                                 # container stays end-on; the camera moves
+
+
+def truck_y(f):
+    t = max(0.0, min(1.0, (f - TRUCK_IN[0]) / (TRUCK_IN[1] - TRUCK_IN[0])))
+    if f < TRUCK_IN[0]:
+        return -60
+    d = max(0.0, (f - DRIVE[0]) / (DRIVE[1] - DRIVE[0]))
+    return -42 * (1 - t) ** 2.2 + 26 * d ** 1.8               # decelerates to a stop, later pulls away
+
+
+def cargo(f):
+    """Once released, the container rides on the truck."""
+    return Vector((0, truck_y(f), 0)) if f >= RELEASE[1] else Vector((0, 0, 0))
 
 
 def apply(f):
     c, yaw = pose(f)
-    hero.location = c
+    hero.location = c + cargo(f)
     hero.rotation_euler = (0, 0, yaw)
-    sp.location = c + Vector((0, 0, 2.59 + 0.05))
+    sp.location = c + Vector((0, 0, 2.59 + 0.05 + 7.0 * seg(f, *RELEASE)))
     sp.rotation_euler = (0, 0, yaw)
+    ty = truck_y(f)
+    truck.location = (4.6, ty, 0)
+    for w, r in truck_wheels:
+        w.rotation_euler = (0, (ty + 60) / r, 0)
+    for o in stack:                       # out of shot during the orbit; would block the truck after it
+        o.hide_render = f > 150
+    for o in truck_parts:                 # parked at y=-60 it would sit in front of the opening side view
+        o.hide_render = f <= 150
+    # frames 1–150 are already rendered: everything new only starts after 150
+    key_a.data.energy = lerp(2.2, 0.6, seg(f, 150, 176))
+    key_b.data.energy = lerp(0.0, 2.0, seg(f, 150, 176))
     # boom IK in stacker-local space
     tip = sp.location + Vector((0, 0, 1.9)) - rs.location
     d = tip - PIVOT
@@ -168,25 +211,50 @@ def apply(f):
     # camera: wide shot → zoom on the container (it ends filling the frame)
     # camera: straight side view, then orbits 90° to face the machine head-on and zooms on the container
     z = seg(f, 62, 122)
+    out = seg(f, TRUCK_IN[0] - 1, TRUCK_IN[1] + 6)      # pull back so the truck fits, ground back at 87%
     cam['yaw'] = lerp(0, 90, z)
     cam['pitch'] = 1.5
-    lib.place_lens_camera(cam, tgt, (lerp(1.6, c.x, z), 0, lerp(6.0, c.z + 1.3, z)), lerp(28, 16.5, z))
+    held = Vector((lerp(1.6, LIFTED.x, z), 0, lerp(6.0, LIFTED.z + 1.3, z)))
+    target = held.lerp(Vector((4.6, 0, 6.25)), out)
+    target.y = 0.8 * truck_y(f) if f >= DRIVE[0] else 0.0   # follow the truck as it pulls away
+    lib.place_lens_camera(cam, tgt, target, lerp(lerp(28, 16.5, z), 30, out))
 
 
 cam, tgt = lib.lens_camera((1.6, 0, 6.0), yaw_deg=0, pitch_deg=1.5, dist=90, width=28)
 
-for f in range(1, 151):
+s.frame_end = LAST
+for f in range(1, LAST + 1):
     apply(f)
-    for o in [hero, sp, boom, inner, cam, tgt] + [r for b in rams for r in b[:2]]:
+    for o in [hero, sp, boom, inner, cam, tgt, truck] + [r for b in rams for r in b[:2]] + [w for w, _ in truck_wheels]:
         for path in ('location', 'rotation_euler', 'rotation_quaternion', 'scale'):
             try:
                 o.keyframe_insert(path, frame=f)
             except Exception:
                 pass
     cam.data.keyframe_insert('lens', frame=f)
+    for o in stack + truck_parts:
+        o.keyframe_insert('hide_render', frame=f)
+    for k in (key_a, key_b):
+        k.data.keyframe_insert('energy', frame=f)
+
+# ----------------------------------------------------------------------------- meta
+# where the ground line (z=0 below the camera target) lands in each frame, 0 = top, 1 = bottom;
+# the page uses it to keep its black ground band glued to the render
+from bpy_extras.object_utils import world_to_camera_view  # noqa: E402
+os.makedirs(args.out, exist_ok=True)
+ground = []
+for f in range(1, LAST + 1):
+    s.frame_set(f)
+    p = tgt.matrix_world.translation.copy()
+    p.z = 0
+    ground.append(round(1 - world_to_camera_view(s, cam, p).y, 4))
+import json  # noqa: E402
+with open(os.path.join(args.out, 'meta.json'), 'w') as fh:
+    json.dump({'count': LAST, 'ground': ground}, fh)
+if args.frames == 'meta':
+    sys.exit(0)
 
 # ----------------------------------------------------------------------------- render
-os.makedirs(args.out, exist_ok=True)
 if '-' in args.frames:
     a, b = map(int, args.frames.split('-'))
     frames = range(a, b + 1)

@@ -79,13 +79,20 @@ function setupJourney(journey) {
   const feats = $$('.j-feat');
   // Blender stacker render plays over the first part of phase A, then hands over to the live scene
   const seqWrap = $('#jSeq');
-  // the wheels' contact line (87% down each frame) sits on the top edge of a thin black ground band
-  const GROUND = 0.9;
+  // frames are placed so the resting ground line (87% down) sits at 90% of the screen; the black
+  // band's top edge follows the ground line Blender reports for each frame (meta.json)
+  let ground = null;
+  fetch('seq/stacker/meta.json').then((r) => r.json()).then((m) => { ground = m.ground; }).catch(() => {});
   const seq = sequencePlayer($('#stackSeq'), {
-    dir: 'seq/stacker', count: 150, bleed: 0.15, anchor: [0.87, GROUND],
+    dir: 'seq/stacker', count: 300, bleed: 0.15, anchor: [0.87, 0.9],
+    onLayout: ({ y, h, H, frame }) => {
+      const g = ground ? ground[frame] : 0.87;
+      seqWrap.style.setProperty('--gh', `${Math.max(0, H - (y + h * g))}px`);
+    },
   });
-  seqWrap.style.setProperty('--gh', `${(1 - GROUND) * 100}%`);
-  const SEQ_END = 0.17;
+  // whole of phase A (journey.js A_END = 0.28); the fade happens just after it, while the live
+  // scene is still holding the sequence's last framing
+  const SEQ_END = 0.29, SEQ_PLAY = 0.28;
   let cardsMax = 0;
   const measure = () => { cardsMax = Math.max(0, cards.scrollWidth - innerWidth + 40); };
   measure();
@@ -96,8 +103,8 @@ function setupJourney(journey) {
     onUpdate: (s) => {
       const P = s.progress;
       journey && journey.setProgress(P);
-      seq.setProgress(range(P, 0, SEQ_END - 0.02));
-      const so = 1 - range(P, SEQ_END - 0.02, SEQ_END);
+      seq.setProgress(range(P, 0, SEQ_PLAY));
+      const so = 1 - range(P, SEQ_PLAY + 0.001, SEQ_END);
       seqWrap.style.opacity = so;
       seqWrap.style.visibility = so > 0 ? 'visible' : 'hidden';
       // B: services panel
@@ -156,7 +163,16 @@ function setupShip(ship) {
 // ---------------------------------------------------------------- plane + arc
 function setupPlane(plane) {
   if (!plane) return;
-  ScrollTrigger.create({ trigger: '#testimonials', start: 'top top', end: 'bottom bottom', onUpdate: (s) => plane.setProgress(s.progress) });
+  const stage = $('.plane-stage'), why = $('#why'), testi = $('#testimonials');
+  const pageTop = (el) => el.getBoundingClientRect().top + scrollY;
+  // from the cloudy end of the ship climb until the testimonials are one screen in
+  ScrollTrigger.create({
+    start: () => pageTop(why) + why.offsetHeight - 2.1 * innerHeight,
+    end: () => pageTop(testi) + 0.9 * innerHeight,
+    invalidateOnRefresh: true,
+    onUpdate: (s) => plane.setProgress(s.progress),
+    onToggle: (s) => { stage.style.visibility = s.isActive ? 'visible' : 'hidden'; },
+  });
 }
 
 // ---------------------------------------------------------------- boot
@@ -165,8 +181,10 @@ async function boot() {
   const [globe, journey, ship, plane] = await Promise.all([
     scene('globe', './scenes/globe.js', 'initGlobe', $('#globe'), $('#globeLabels')),
     scene('journey', './scenes/journey.js', 'initJourney', $('#journeyCanvas'), (v) => { $('#jSpeed').textContent = String(v).padStart(2, '0'); }),
-    scene('ship', './scenes/ship.js', 'initShip', $('#shipCanvas')),
-    scene('plane', './scenes/plane.js', 'initPlane', $('#planeCanvas')),
+    // ship: pre-rendered Blender sequence (top-down, climbs into the clouds)
+    sequencePlayer($('#shipCanvas'), { dir: 'seq/ship', count: 200, fit: 'cover', lazy: true }),
+    // jet: pre-rendered Blender sequence on a transparent background
+    sequencePlayer($('#planeCanvas'), { dir: 'seq/plane', count: 180, bleed: 0.6, lazy: true }),
     plMapReady,
   ]);
 
@@ -174,6 +192,9 @@ async function boot() {
   setupJourney(journey);
   setupShip(ship);
   setupPlane(plane);
+  // fetch the ship and jet frames a few screens before they are needed
+  ScrollTrigger.create({ trigger: '#why', start: 'top 400%', once: true, onEnter: () => ship.load() });
+  ScrollTrigger.create({ trigger: '#why', start: 'top bottom', once: true, onEnter: () => plane.load() });
   setupCurves();
   setupReveals();
   setupFooter();

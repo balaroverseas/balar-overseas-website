@@ -442,3 +442,83 @@ def seg(f, a, b):
 
 def lerp(a, b, t):
     return a + (b - a) * t
+
+
+# ----------------------------------------------------------------------------- top-down scenes (ship, plane)
+def prism(name, pts, z0, z1, m, bevel=0.15, parent=None):
+    """Extrude a closed outline drawn in the X/Y plane (top view) from z0 to z1."""
+    me = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    vs = [bm.verts.new((x, y, z0)) for x, y in pts]
+    f = bm.faces.new(vs)
+    r = bmesh.ops.extrude_face_region(bm, geom=[f])
+    top = [v for v in r['geom'] if isinstance(v, bmesh.types.BMVert)]
+    bmesh.ops.translate(bm, vec=(0, 0, z1 - z0), verts=top)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(me)
+    bm.free()
+    o = bpy.data.objects.new(name, me)
+    bpy.context.scene.collection.objects.link(o)
+    o.data.materials.append(m)
+    if parent:
+        o.parent = parent
+    if bevel:
+        b = o.modifiers.new('bevel', 'BEVEL')
+        b.width, b.segments, b.limit_method = bevel, 3, 'ANGLE'
+    return o
+
+
+def node(nt, kind, **inputs):
+    n = nt.nodes.new(kind)
+    for k, v in inputs.items():
+        n.inputs[k].default_value = v
+    return n
+
+
+def cloud_mat(name, seed):
+    """Puffy cloud layer; fades out when the camera gets close so passing through never pops."""
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    nt = m.node_tree
+    out = nt.nodes['Material Output']
+    b = nt.nodes['Principled BSDF']
+    b.inputs['Base Color'].default_value = (1, 1, 1, 1)
+    b.inputs['Roughness'].default_value = 1.0
+    b.inputs['Emission Color'].default_value = (0.82, 0.86, 0.95, 1)
+    b.inputs['Emission Strength'].default_value = 0.9
+    tc = nt.nodes.new('ShaderNodeTexCoord')
+    mp = nt.nodes.new('ShaderNodeMapping')
+    mp.inputs['Location'].default_value = (seed * 137.0, seed * 59.0, 0)
+    nt.links.new(tc.outputs['Object'], mp.inputs['Vector'])
+    n = node(nt, 'ShaderNodeTexNoise', Scale=0.0045, Detail=12.0, Roughness=0.62)
+    nt.links.new(mp.outputs['Vector'], n.inputs['Vector'])
+    ramp = nt.nodes.new('ShaderNodeValToRGB')
+    ramp.color_ramp.elements[0].position = 0.52
+    ramp.color_ramp.elements[1].position = 0.6
+    nt.links.new(n.outputs['Fac'], ramp.inputs['Fac'])
+    cam = nt.nodes.new('ShaderNodeCameraData')
+    near = nt.nodes.new('ShaderNodeMapRange')
+    near.inputs['From Min'].default_value = 8
+    near.inputs['From Max'].default_value = 70
+    nt.links.new(cam.outputs['View Distance'], near.inputs['Value'])
+    mul = nt.nodes.new('ShaderNodeMath')
+    mul.operation = 'MULTIPLY'
+    nt.links.new(ramp.outputs['Color'], mul.inputs[0])
+    nt.links.new(near.outputs['Result'], mul.inputs[1])
+    tr = nt.nodes.new('ShaderNodeBsdfTransparent')
+    mx = nt.nodes.new('ShaderNodeMixShader')
+    nt.links.new(mul.outputs['Value'], mx.inputs['Fac'])
+    nt.links.new(tr.outputs['BSDF'], mx.inputs[1])
+    nt.links.new(b.outputs['BSDF'], mx.inputs[2])
+    nt.links.new(mx.outputs['Shader'], out.inputs['Surface'])
+    return m
+
+
+def plane(name, sx, sy, loc, m):
+    bpy.ops.mesh.primitive_plane_add(size=1, location=loc)
+    o = bpy.context.active_object
+    o.name = name
+    # bake the size into the mesh so Object texture coordinates stay in metres
+    o.data.transform(__import__('mathutils').Matrix.Diagonal((sx, sy, 1, 1)))
+    o.data.materials.append(m)
+    return o
