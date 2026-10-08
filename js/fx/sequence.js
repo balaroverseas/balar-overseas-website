@@ -2,7 +2,7 @@
 // Frames load progressively: first frame, then a coarse pass, then everything else,
 // so scrubbing works immediately and sharpens as frames arrive. With `lazy`, nothing
 // loads until load() or the first setProgress().
-export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contain', align = 'center', bleed = 0, anchor = null, onLayout = null, lazy = false }) {
+export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contain', align = 'center', bleed = 0, anchor = null, onLayout = null, lazy = false, shadow = null }) {
   const g = canvas.getContext('2d');
   const frames = new Array(count).fill(null);
   let current = 0, W = 0, H = 0, dpr = 1;
@@ -47,6 +47,14 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contai
     const x = (W - w) / 2;
     // anchor [a, b]: put the point a (fraction of image height) at b (fraction of canvas height)
     const y = anchor ? H * anchor[1] - h * anchor[0] : align === 'bottom' ? H - h : (H - h) / 2;
+    if (shadow) {
+      // soft drop shadow from the frame's own alpha (e.g. the jet over the page)
+      g.save();
+      g.filter = `brightness(0) blur(${shadow.blur * (w / img.width)}px)`;
+      g.globalAlpha = shadow.alpha;
+      g.drawImage(img, x + shadow.dx * w, y + shadow.dy * h, w, h);
+      g.restore();
+    }
     g.drawImage(img, x, y, w, h);
     onLayout && onLayout({ x, y, w, h, W, H, frame: current });
   }

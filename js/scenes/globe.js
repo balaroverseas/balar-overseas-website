@@ -237,9 +237,11 @@ export async function initGlobe(canvas, labelLayer) {
   const layout = { x: 0, y: 0, z: 3.3 };
   stage.onResize = (w, h) => {
     const mob = isMobile();
-    layout.x = mob ? 0 : 0.1;
-    layout.y = mob ? 0.02 : 0;
-    camera.position.z = mob ? 4.1 : 4.5;
+    // desktop: like the reference, a big globe (radius ≈ 53vh) centred at ~88vw / 46vh,
+    // running off the right and top edges
+    layout.x = mob ? 0 : 0.45;
+    layout.y = mob ? 0.02 : 0.08;
+    camera.position.z = mob ? 4.1 : 3.0;
     dotMat.uniforms.uSize.value = (Math.min(h, w * 1.1) / 330) * camera.position.z * renderer.getPixelRatio();
   };
   stage.resize();
@@ -274,7 +276,7 @@ export async function initGlobe(canvas, labelLayer) {
     tilt.rotation.x = 0.38 + offX + my * 0.08;
     tilt.rotation.z = -0.08 + mx * 0.05;
     root.position.x = layout.x;
-    root.position.y = layout.y + Math.pow(state.scroll, 1.4) * 4.5;
+    root.position.y = layout.y + Math.pow(state.scroll, 1.4) * 0.9;   // drifts up a little; the horizon covers it
     root.scale.setScalar((0.6 + 0.4 * intro) * (1 + state.scroll * 0.25));
 
     rings.forEach(({ ring, off }) => {

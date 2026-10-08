@@ -1,11 +1,8 @@
-"""Reach stacker lifts the Balar container off the stack while the camera orbits to face
-it (frames 1–150), a truck rolls in underneath, the container is set down on the trailer
-and the truck pulls away (151–300). Transparent background, renders WebP frames plus
-meta.json (ground line per frame).
-
-  blender -b -P stacker.py -- --frames 40          (one test frame)
-  blender -b -P stacker.py -- --frames 1-150 --samples 64
-"""
+"""Reach stacker drives up to the stack, picks the Balar box, backs off while turning to face
+the camera, and a truck reverses in underneath; the box is set down, the spreader lets go and
+the camera drops so the ground fills the lower part of the frame (frames 1-300, side view from
+-Y, camera never orbits - like the reference). Transparent WebP frames + meta.json (ground line
+per frame and the final framing)."""
 import sys
 import os
 import math
@@ -130,75 +127,104 @@ for o in stack_roots:
 stack = [c for o in stack_roots for c in [o] + list(o.children_recursive)]   # hide_render is per object
 hero = container('hero', '#b9bec5', label='BALAR OVERSEAS', label_color='#1e2328')
 
-# truck drives in along +Y (screen left → right once the camera has orbited) under the container
+# truck reverses in from the right (cab on the right, like the reference) under the container
 from truck import build_truck, DECK  # noqa: E402
-truck, truck_wheels = build_truck(loc=(4.6, -60, 0))
-truck.rotation_euler = (0, 0, math.pi / 2)
-truck_parts = [truck] + list(truck.children_recursive)
+truck, truck_wheels = build_truck(loc=(40, -8, 0), cab_color='#1a1c21')
 
 lib.studio_light(sun_dir=(-55, 0, -32), strength=1.1, sky_strength=0.07)   # soft fill + rim
-key_a = lib.sun_toward((0.45, 0.55, -0.7), strength=2.2)                   # key light from the side camera
-key_b = lib.sun_toward((-0.55, 0.45, -0.7), strength=0.0)                  # key light once the camera has orbited
-# dark ground like the reference: seen almost edge-on it reads as a black band
+key_a = lib.sun_toward((0.45, 0.55, -0.7), strength=2.2)                   # key light from the camera side
 lib.shadow_floor()   # contact shadows only; the black ground band is drawn by the page (like the reference)
 
 # ----------------------------------------------------------------------------- animation
+# Camera stays put (side view from -Y) like the reference; the machine does the moving:
+# drive in → pick the top box → lift → back off while turning 90° to face the camera →
+# camera pans onto the box → truck reverses in underneath → set down → spreader lets go →
+# camera drops so the ground fills the lower 40% (the services panel takes over from there).
 START = Vector(((STACK_X[0] + STACK_X[1]) / 2, 0, 2.59))
-LIFTED = Vector((4.6, 0, 7.6))
-
-
-TRUCK_IN = (151, 196)      # truck rolls in and stops under the container
-LOWER = (198, 232)         # container lowered onto the trailer
-RELEASE = (236, 258)       # spreader lets go and rises out of the way
-DRIVE = (260, 300)         # truck pulls away to the right, the camera follows it
+SP_UP = 2.59 + 0.05                       # spreader sits this far above the box origin
+DRIVE_IN = (1, 60)
+LIFT = (62, 96)
+TURN = (100, 152)
+PAN = (110, 176)
+TRUCK_IN = (158, 214)
+LOWER = (218, 248)
+RELEASE = (250, 272)
+FINAL = (258, 300)
 LAST = 300
+RS_A, RS_B, RS_C = -7.0, -4.5, -10.0      # stacker x: start, at the stack, after backing off
+CARRY = Vector((8.0, 0, 7.6))             # box centre in stacker-local space while carried
+TRUCK_X = RS_C                            # trailer centre ends under the box
+FINAL_DX = 0.3                            # last frame: camera centre relative to the trailer centre (keeps the stack out)
+BOX_Y = -CARRY.x                          # box (and truck) y once the machine faces the camera
 
 
-def pose(f):
-    lift = seg(f, 15, 55)
-    c = START.lerp(LIFTED, lift)
-    c.z += math.sin(lift * math.pi) * 0.6               # slight arc while lifting
-    c.z = lerp(c.z, DECK, seg(f, *LOWER))
-    return c, math.pi / 2                                 # container stays end-on; the camera moves
+def rot(v, th):
+    c, s_ = math.cos(th), math.sin(th)
+    return Vector((v.x * c - v.y * s_, v.x * s_ + v.y * c, v.z))
 
 
-def truck_y(f):
-    t = max(0.0, min(1.0, (f - TRUCK_IN[0]) / (TRUCK_IN[1] - TRUCK_IN[0])))
-    if f < TRUCK_IN[0]:
-        return -60
-    d = max(0.0, (f - DRIVE[0]) / (DRIVE[1] - DRIVE[0]))
-    return -42 * (1 - t) ** 2.2 + 26 * d ** 1.8               # decelerates to a stop, later pulls away
+def state(f):
+    """Stacker position/heading and the spreader in stacker-local space."""
+    drive = seg(f, *DRIVE_IN)
+    back = seg(f, *TURN)
+    th = lerp(0.0, -math.pi / 2, back)
+    x = lerp(lerp(RS_A, RS_B, drive), RS_C, back)
+    x += lerp(0, -20.0, seg(f, FINAL[0] + 2, LAST - 4) ** 1.3)     # finally drives out of shot (left)
+    y = lerp(0, 6.0, seg(f, FINAL[0] + 4, LAST))
+    rs_loc = Vector((x, y, 0))
+    start_local = START - Vector((RS_B, 0, 0))                      # where the box sits, seen from the pick spot
+    lift = seg(f, *LIFT)
+    box_local = start_local.lerp(CARRY, lift)
+    box_local.z += math.sin(lift * math.pi) * 0.8
+    sp_local = box_local + Vector((0, 0, SP_UP))
+    # before the pick the spreader comes down from a parked position onto the box
+    parked = Vector((8.5, 0, 9.8))
+    sp_local = parked.lerp(sp_local, seg(f, 8, 58)) if f < 60 else sp_local
+    return rs_loc, th, sp_local, box_local
 
 
-def cargo(f):
-    """Once released, the container rides on the truck."""
-    return Vector((0, truck_y(f), 0)) if f >= RELEASE[1] else Vector((0, 0, 0))
+def truck_x(f):
+    t = seg(f, *TRUCK_IN)
+    return lerp(40.0, TRUCK_X, 1 - (1 - t) ** 2)                    # backs in, easing to a stop
 
 
 def apply(f):
-    c, yaw = pose(f)
-    hero.location = c + cargo(f)
-    hero.rotation_euler = (0, 0, yaw)
-    sp.location = c + Vector((0, 0, 2.59 + 0.05 + 7.0 * seg(f, *RELEASE)))
-    sp.rotation_euler = (0, 0, yaw)
-    ty = truck_y(f)
-    truck.location = (4.6, ty, 0)
+    rs_loc, th, sp_local, box_local = state(f)
+    rs.location = rs_loc
+    rs.rotation_euler = (0, 0, th)
+    box_world = rs_loc + rot(box_local, th)
+    if f < 60:                                                       # still on the stack
+        box_world = START.copy()
+    lower = seg(f, *LOWER)
+    if f >= TURN[1]:                                                 # carried box is over the trailer now
+        box_world.z = lerp(box_world.z, DECK, lower)
+    if f >= RELEASE[0]:                                              # let go: the box stays on the truck
+        rs_r, th_r, spl_r, bl_r = state(RELEASE[0])
+        box_world = rs_r + rot(bl_r, th_r)
+        box_world.z = DECK
+    hero.location = box_world
+    hero.rotation_euler = (0, 0, math.pi / 2 + (th if f >= 60 else 0))
+    # spreader: rides on the box until released, then rises and pulls in
+    if f < RELEASE[0]:
+        sp_world = box_world + Vector((0, 0, SP_UP)) if f >= 60 else rs_loc + rot(sp_local, th)
+        sp_local_now = rot(sp_world - rs_loc, -th)
+    else:
+        up = seg(f, *RELEASE)
+        base = rot(Vector((box_world.x, box_world.y, DECK + SP_UP)) - rs_loc, -th)
+        sp_local_now = base + Vector((-2.5 * up, 0, 6.5 * up))
+        sp_world = rs_loc + rot(sp_local_now, th)
+    sp.location = sp_world
+    sp.rotation_euler = (0, 0, math.pi / 2 + th)
+    tx = truck_x(f)
+    truck.location = (tx, BOX_Y, 0)
     for w, r in truck_wheels:
-        w.rotation_euler = (0, (ty + 60) / r, 0)
-    for o in stack:                       # out of shot during the orbit; would block the truck after it
-        o.hide_render = f > 150
-    for o in truck_parts:                 # parked at y=-60 it would sit in front of the opening side view
-        o.hide_render = f <= 150
-    # frames 1–150 are already rendered: everything new only starts after 150
-    key_a.data.energy = lerp(2.2, 0.6, seg(f, 150, 176))
-    key_b.data.energy = lerp(0.0, 2.0, seg(f, 150, 176))
+        w.rotation_euler = (0, -(tx - 40.0) / r, 0)
     # boom IK in stacker-local space
-    tip = sp.location + Vector((0, 0, 1.9)) - rs.location
+    tip = sp_local_now + Vector((0, 0, 1.9))
     d = tip - PIVOT
     ang = math.atan2(d.z, d.x)
     boom.rotation_euler = (0, -ang, 0)
     inner.location = (max(0.0, d.length - 10.0), 0, 0)
-    # lift cylinders: from chassis base to a point 4 m along the boom
     top = PIVOT + Vector((math.cos(ang) * 4.0, 0, math.sin(ang) * 4.0))
     v = top - BASE
     q = Vector((0, 0, 1)).rotation_difference(v.normalized())
@@ -208,35 +234,32 @@ def apply(f):
         rod.location = Vector((BASE.x, yy, BASE.z)) + v.normalized() * 2.4
         rod.rotation_quaternion = q
         rod.scale = (1, 1, max(0.2, v.length - 2.4))
-    # camera: wide shot → zoom on the container (it ends filling the frame)
-    # camera: straight side view, then orbits 90° to face the machine head-on and zooms on the container
-    z = seg(f, 62, 122)
-    out = seg(f, TRUCK_IN[0] - 1, TRUCK_IN[1] + 6)      # pull back so the truck fits, ground back at 87%
-    cam['yaw'] = lerp(0, 90, z)
-    cam['pitch'] = 1.5
-    held = Vector((lerp(1.6, LIFTED.x, z), 0, lerp(6.0, LIFTED.z + 1.3, z)))
-    target = held.lerp(Vector((4.6, 0, 6.25)), out)
-    target.y = 0.8 * truck_y(f) if f >= DRIVE[0] else 0.0   # follow the truck as it pulls away
-    lib.place_lens_camera(cam, tgt, target, lerp(lerp(28, 16.5, z), 30, out))
+    # camera: wide (stack on the right, ground at 90%) → pans/zooms onto the turned box →
+    # drops so the ground line sits at 60% with the loaded truck centred
+    wide = (Vector((1.1, 0, 6.24)), 30.0)
+    held = (Vector((RS_C + 1.0, BOX_Y, 5.6)), 26.0)
+    final = (Vector((TRUCK_X + FINAL_DX, BOX_Y, 1.63)), 29.0)
+    p, fin = seg(f, *PAN), seg(f, *FINAL)
+    target = wide[0].lerp(held[0], p).lerp(final[0], fin)
+    width = lerp(lerp(wide[1], held[1], p), final[1], fin)
+    cam['yaw'], cam['pitch'] = 0, 1.5
+    lib.place_lens_camera(cam, tgt, target, width)
+    return width
 
 
-cam, tgt = lib.lens_camera((1.6, 0, 6.0), yaw_deg=0, pitch_deg=1.5, dist=90, width=28)
+cam, tgt = lib.lens_camera((1.1, 0, 6.24), yaw_deg=0, pitch_deg=1.5, dist=90, width=30)
 
 s.frame_end = LAST
+widths = []
 for f in range(1, LAST + 1):
-    apply(f)
-    for o in [hero, sp, boom, inner, cam, tgt, truck] + [r for b in rams for r in b[:2]] + [w for w, _ in truck_wheels]:
+    widths.append(apply(f))
+    for o in [rs, hero, sp, boom, inner, cam, tgt, truck] + [r for b in rams for r in b[:2]] + [w for w, _ in truck_wheels]:
         for path in ('location', 'rotation_euler', 'rotation_quaternion', 'scale'):
             try:
                 o.keyframe_insert(path, frame=f)
             except Exception:
                 pass
     cam.data.keyframe_insert('lens', frame=f)
-    for o in stack + truck_parts:
-        o.keyframe_insert('hide_render', frame=f)
-    for k in (key_a, key_b):
-        k.data.keyframe_insert('energy', frame=f)
-
 # ----------------------------------------------------------------------------- meta
 # where the ground line (z=0 below the camera target) lands in each frame, 0 = top, 1 = bottom;
 # the page uses it to keep its black ground band glued to the render
@@ -250,7 +273,8 @@ for f in range(1, LAST + 1):
     ground.append(round(1 - world_to_camera_view(s, cam, p).y, 4))
 import json  # noqa: E402
 with open(os.path.join(args.out, 'meta.json'), 'w') as fh:
-    json.dump({'count': LAST, 'ground': ground}, fh)
+    # end: framing of the last frame, so the live scene can pick up exactly there
+    json.dump({'count': LAST, 'ground': ground, 'end': {'width': widths[-1], 'dx': 1.35 - FINAL_DX}}, fh)
 if args.frames == 'meta':
     sys.exit(0)
 

@@ -131,7 +131,7 @@ plane('far_sea', 9000, 9000, (0, 0, -1600), sea_m)
 clouds = [plane(f'cloud{i}', 6000, 6000, (0, 0, z), cloud_mat(f'cloud{i}', i + 4)) for i, z in enumerate((-90, -190, -320))]
 for o in clouds + [s.objects['far_sea']]:
     o.hide_render = not args.bg
-lib.studio_light(sun_dir=(-22, 0, -30), strength=1.7, sky_strength=0.1)
+lib.studio_light(sun_dir=(-22, 0, -30), strength=1.7, sky_strength=0.1)   # the page draws the soft shadow
 
 cam_data = bpy.data.cameras.new('cam')
 cam_data.lens = 36 * 220 / 64        # 64 m wide at the aircraft (wings just fit)

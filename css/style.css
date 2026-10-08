@@ -10,7 +10,7 @@
   --display:"Saira","Helvetica Neue",Arial,sans-serif;
   --body:"Inter","Helvetica Neue",Arial,sans-serif;
   --mono:"Share Tech Mono",ui-monospace,monospace;
-  --pad:clamp(16px,3.4vw,48px);
+  --pad:clamp(16px,2.34vw,44px);
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{overflow-x:clip}
@@ -19,7 +19,7 @@ body.loading{overflow:hidden}
 img{display:block;max-width:100%}
 a{color:inherit;text-decoration:none}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
-.wrap{max-width:1440px;margin:0 auto;padding:0 var(--pad)}
+.wrap{max-width:2200px;margin:0 auto;padding:0 var(--pad)}
 .display{font-family:var(--display);font-stretch:125%;font-weight:700;text-transform:uppercase;line-height:.92;letter-spacing:-.005em}
 .mono{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase}
 .muted{color:#a5a5a5}
@@ -72,6 +72,17 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .menu-btn .dots{display:flex;gap:3px;font-style:normal}
 .menu-btn .dots b{width:3px;height:3px;background:currentColor;border-radius:50%;transition:transform .3s}
 .menu-btn:hover .dots b:nth-child(2){transform:translateY(-3px)}
+/* desktop: at the top of the page the links stand in a column (aligned with the hero copy),
+   once scrolled they fold into the MENU button — like the reference */
+.navlist{position:absolute;left:28.75vw;top:48px;display:none;flex-direction:column;gap:max(10px,1.2vw);font-size:clamp(10px,.72vw,13px);text-transform:uppercase;transition:opacity .4s}
+.navlist a{opacity:.92;transition:opacity .2s,transform .3s}
+.navlist a:hover{opacity:1;transform:translateX(4px)}
+.menu-btn{transition:opacity .4s}
+@media (min-width:1100px){
+  .navlist{display:flex}
+  .site-head:not(.at-top) .navlist{opacity:0;pointer-events:none}
+  .site-head.at-top .menu-btn{opacity:0;pointer-events:none}
+}
 .pill{margin-left:auto;height:38px;padding:0 20px;display:flex;align-items:center;border-radius:999px;background:#fff;color:#000;font-family:var(--mono);font-size:12px;text-transform:uppercase;transition:background .3s,color .3s}
 .site-head[data-theme="light"] .pill{background:#000;color:#fff}
 .pill:hover{background:var(--accent)!important;color:#fff!important}
@@ -86,7 +97,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .menu-mail{display:block;margin-top:6px;font-size:14px}
 
 /* ---------- Hero ---------- */
-.hero{position:relative;height:225vh;background:#000;color:#fff}
+.hero{position:relative;height:281vh;background:#000;color:#fff}
 .hero-sticky{position:sticky;top:0;height:100vh;height:100svh;overflow:hidden}
 .stars{position:absolute;inset:0;background:radial-gradient(ellipse 60% 40% at 40% 35%,rgba(120,100,180,.12),transparent 70%)}
 .hero-globe{position:absolute;top:0;right:-14vw;width:78vw;height:100%;cursor:grab}
@@ -94,32 +105,36 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .globe-labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
 .glabel{position:absolute;left:0;top:0;font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;color:#fff;background:rgba(0,0,0,.75);border:1px solid rgba(255,255,255,.3);padding:2px 6px;margin:-24px 0 0 6px;opacity:0}
 .glabel.home{border-color:var(--orange)}
-.hero-copy{position:absolute;left:var(--pad);bottom:12vh;z-index:2;max-width:560px}
-.kicker{font-family:var(--display);font-stretch:125%;font-weight:600;text-transform:uppercase;font-size:clamp(15px,1.4vw,20px);margin-bottom:10px}
-.hero h1{font-size:clamp(48px,7.4vw,112px)}
-.hero-copy p{max-width:340px;color:#cfcfcf;font-size:14px;margin:28px 0 28px}
+/* hero copy sits in the nav-list column (28.75vw) near the bottom, sized in vw like the reference */
+.hero-copy{position:absolute;left:28.75vw;bottom:4vh;z-index:2;max-width:42vw}
+.kicker{font-family:var(--display);font-stretch:125%;font-weight:600;text-transform:uppercase;font-size:clamp(13px,1.16vw,22px);margin-bottom:.6vw}
+.hero h1{font-size:clamp(44px,5.56vw,110px);line-height:1.05}
+.hero-copy p{max-width:max(240px,18vw);color:#cfcfcf;font-size:clamp(12px,.93vw,17px);line-height:1.2;margin:2.6vw 0 3.4vw}
+@media (max-width:900px){.hero-copy{left:var(--pad);bottom:12vh;max-width:none}.hero-copy p{margin:24px 0}}
 .cta-row{display:flex;gap:10px;flex-wrap:wrap}
-.atmo{position:absolute;left:-10%;right:-10%;top:100%;height:420vh;z-index:3;pointer-events:none;background:linear-gradient(180deg,rgba(0,0,0,0) 0,#050418 26vh,#1a17a8 66vh,#3b47ff 92vh,#7ea2ff 123vh,#d6e4ff 154vh,#fff 180vh);border-radius:50% 50% 0 0/14% 14% 0 0;will-change:transform}
+/* a planet-sized glowing horizon rises from below (curved edge, dark corners linger), ending in white */
+.atmo{position:absolute;left:50%;top:0;width:210vw;height:340vh;margin-left:-105vw;z-index:3;pointer-events:none;will-change:transform;
+  background:linear-gradient(rgba(255,255,255,0) 50%,#fff 50%),radial-gradient(closest-side,#fff 0,#fff 70%,#e4eaff 75%,#a3b7ff 80.5%,#5d6cff 85.5%,#3324dc 89.5%,#1f0fa6 92.5%,rgba(20,8,120,.75) 95%,rgba(14,5,80,.4) 97.5%,rgba(10,4,50,.12) 99%,rgba(10,4,50,0) 100%)}
 
 /* ---------- Intro ---------- */
-.intro{position:relative;z-index:4;margin-top:-55vh;background:linear-gradient(180deg,rgba(255,255,255,0) 0,#fff 55vh);padding:20vh 0 30px}
-.intro-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(30px,5vw,80px);align-items:start}
-.intro-left{position:sticky;top:110px}
-.intro-img{width:min(360px,80%);aspect-ratio:16/10;object-fit:cover;margin-bottom:clamp(60px,10vh,120px)}
-.intro-title{font-size:clamp(38px,5vw,76px)}
-.reveal-text{font-family:var(--body);font-weight:500;font-size:clamp(22px,2.3vw,34px);line-height:1.22;letter-spacing:-.01em;margin-bottom:34px}
+.intro{position:relative;z-index:4;margin-top:-80vh;background:linear-gradient(180deg,rgba(255,255,255,0) 0,#fff 55vh);padding:6vh 0 30px}
+.intro-grid{display:grid;grid-template-columns:60.3vw 1fr;gap:0;align-items:start}
+.intro-left{position:sticky;top:110px;padding-top:8.1vw}
+.intro-img{width:17vw;min-width:160px;aspect-ratio:217/138;object-fit:cover;margin-bottom:2.8vw}
+.intro-title{font-size:clamp(34px,4.17vw,80px);line-height:1.05;max-width:36vw}
+.reveal-text{font-family:var(--body);font-weight:500;font-size:clamp(18px,1.62vw,32px);line-height:1.2;letter-spacing:-.01em;margin-bottom:3.4vw}
 .reveal-text .rw{color:#d2d2d2;transition:color .25s}
 .reveal-text .rw.on{color:#000}
 .reveal-text em{font-style:normal}
 .reveal-text em .rw.on{color:var(--accent)}
-.stats{margin-top:70px}
-.stats-cap{font-size:13px;border-bottom:1px solid var(--line);padding-bottom:14px}
-.stat{border-bottom:1px solid var(--line);padding:26px 0}
-.stat .num{font-family:var(--display);font-stretch:125%;font-weight:700;font-size:clamp(64px,8vw,128px);line-height:1}
-.stat .lbl{margin-top:10px;font-size:15px}
+.stats{margin-top:11.3vw}
+.stats-cap{font-size:clamp(12px,.93vw,16px);padding-bottom:1.1vw;border-bottom:1px solid var(--line);margin-bottom:2.2vw}
+.stat{border-bottom:1px solid var(--line);padding:0 0 4.9vw;margin-bottom:3.4vw}
+.stat .num{font-family:var(--display);font-stretch:125%;font-weight:700;font-size:clamp(60px,9.26vw,170px);line-height:1.05}
+.stat .lbl{margin-top:1.4vw;font-size:clamp(14px,1.39vw,24px);color:rgba(17,17,17,.72)}
 
 /* ---------- Journey ---------- */
-.journey{position:relative;height:1200vh;background:#fff}
+.journey{position:relative;height:1532vh;background:#fff}
 .journey-sticky{position:sticky;top:0;height:100vh;height:100svh;overflow:hidden}
 #journeyCanvas{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:1}
 /* pre-rendered Blender stacker sequence; black ground band like the reference */
@@ -241,7 +256,26 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .cta p{max-width:420px;margin:0 auto 30px;color:#d0d0d0}
 
 /* ---------- Footer ---------- */
-footer{background:#fff;padding-top:110px;overflow:hidden}
+footer{background:#fff;padding-top:3vw;overflow:hidden}
+/* footer head rows, laid out like the reference: tagline / socials·menu·quote / industries-services marquee */
+.f-head{padding:0 0 2.2vw}
+.f-tag{font-size:clamp(11px,.93vw,15px);line-height:1.3}
+.f-nav{display:grid;grid-template-columns:28.75vw 1fr 1fr;gap:24px;padding:2.4vw 0;border-top:1px solid var(--line)}
+.f-nav .mono{display:block;font-size:10px;color:#777;margin-bottom:12px;text-transform:uppercase}
+.f-soc-icons{display:flex;gap:6px}
+.f-soc-icons a{display:grid;place-items:center;width:30px;height:30px;border:1px solid var(--line);border-radius:50%;font-family:var(--mono);font-size:10px;text-transform:uppercase;transition:background .25s,color .25s}
+.f-soc-icons a:hover{background:#111;color:#fff}
+.f-menu{columns:3;column-gap:24px;list-style:none;padding:0;margin:0;font-size:clamp(12px,.93vw,15px);line-height:2}
+.f-menu a:hover{color:var(--accent)}
+.f-quote{font-size:clamp(12px,.93vw,15px);max-width:280px;margin:0 0 10px}
+.f-tabs{padding:1.6vw 0 2.2vw;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin-bottom:3vw}
+.f-tabbar button{font:inherit;font-size:10px;text-transform:uppercase;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:none;color:inherit;margin-right:6px;cursor:pointer;transition:background .25s,color .25s}
+.f-tabbar button.on{background:#111;color:#fff;border-color:#111}
+.f-marquee{overflow:hidden;margin-top:1.4vw;-webkit-mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)}
+.f-track{display:flex;width:max-content;white-space:nowrap;font-family:var(--display);font-stretch:112%;font-weight:600;font-size:clamp(22px,2.6vw,46px);color:#cfcfcf;animation:fmarq 45s linear infinite}
+.f-track span{padding-right:.6em}
+@keyframes fmarq{to{transform:translateX(-50%)}}
+@media (max-width:900px){.f-nav{grid-template-columns:1fr}.f-menu{columns:2}}
 .f-top{display:grid;grid-template-columns:1fr 1fr;gap:40px;padding-bottom:50px}
 .f-img{width:min(420px,100%);aspect-ratio:16/10;object-fit:cover;filter:grayscale(1)}
 .f-contact{display:flex;flex-direction:column;gap:30px}
@@ -276,6 +310,7 @@ footer{background:#fff;padding-top:110px;overflow:hidden}
   .hero-copy{right:var(--pad);bottom:8vh}
   .intro-grid,.drives-grid,.f-top,.f-mid,.testi-head{grid-template-columns:1fr}
   .intro-left,.drives-left{position:static}
+  .intro-title{max-width:none}.intro-left{padding-top:0}.intro-img{width:60%}
   .intro-img{margin-bottom:40px}
   .faq-grid{grid-template-columns:1fr}
   .j-panel{top:40%}
@@ -311,8 +346,7 @@ footer{background:#fff;padding-top:110px;overflow:hidden}
 /* =====================================================================
    INNER PAGES – shared
    ===================================================================== */
-/* extra 16vh at the bottom is covered by the next section's rounded top */
-.page-hero{position:relative;height:calc(100vh + 16vh);height:calc(100svh + 16vh);min-height:640px;background:#060608;color:#fff;overflow:hidden;display:flex;align-items:flex-end;padding:0 0 calc(9vh + 16vh)}
+.page-hero{position:relative;height:100vh;height:100svh;min-height:640px;background:#060608;color:#fff;overflow:hidden;display:flex;align-items:flex-end;padding:0 0 9vh}
 .ph-bg{position:absolute;inset:0;background-size:cover;background-position:center;transform:scale(1.12);will-change:transform}
 .ph-bg::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.55) 0%,rgba(0,0,0,.15) 40%,rgba(0,0,0,.75) 100%)}
 .ph-canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
@@ -505,3 +539,7 @@ footer{background:#fff;padding-top:110px;overflow:hidden}
   .reasons,.fields{grid-template-columns:1fr}
   .vmo-copy{justify-self:start}
 }
+/* dark section rising as a glowing dome over the white page (soft purple rim), like the reference */
+.horizon{position:relative;z-index:5;background:#111}
+.horizon::before{content:"";position:absolute;left:50%;top:-62vh;width:230vw;height:124vh;margin-left:-115vw;pointer-events:none;z-index:-1;
+  background:linear-gradient(rgba(17,17,17,0) 50%,#111 50%),radial-gradient(closest-side,#111 0,#111 70%,#1d1470 77%,#3a2ae0 83%,#7a6bff 88%,rgba(160,150,255,.6) 93%,rgba(215,210,255,.25) 97%,rgba(255,255,255,0) 100%)}

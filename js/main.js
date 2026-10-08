@@ -63,13 +63,19 @@ function setupHero(globe) {
       hero.dataset.dynTheme = p > 0.9 ? 'light' : 'dark';
     },
   });
-  gsap.to('.hero-copy', { y: -160, opacity: 0, ease: 'none', scrollTrigger: { trigger: hero, start: 'top top', end: '22% top', scrub: true } });
-  // the atmosphere is fully white exactly when the hero ends, so the intro follows with no gap
-  gsap.fromTo('#atmo', { y: 0 }, {
-    y: () => -2.85 * innerHeight, ease: 'none',
-    scrollTrigger: { trigger: hero, start: '12% top', end: 'bottom bottom', scrub: true, invalidateOnRefresh: true },
-  });
-  gsap.to('.hero-globe', { opacity: 0, ease: 'none', scrollTrigger: { trigger: hero, start: '30% top', end: '50% top', scrub: true } });
+  // copy is gone within the first ~200px, like the reference
+  gsap.to('.hero-copy', { y: -90, opacity: 0, ease: 'none', scrollTrigger: { trigger: hero, start: 'top top', end: '+=200', scrub: true } });
+  // glowing horizon: its top edge enters at the bottom after ~300px and climbs ~1.43 screen
+  // heights per 1000px scrolled (measured off the reference at 720px tall: 100% @300, 64% @500,
+  // 40% @700, 12% @900); the intro's own white fade takes over at the end
+  const atmo = $('#atmo');
+  const placeAtmo = () => {
+    const s = Math.max(0, scrollY - (hero.getBoundingClientRect().top + scrollY));
+    const k = 720 / innerHeight;                             // keep the same pace on other screen heights
+    const top = (1.02 - 0.00143 * Math.max(0, s * k - 300)) * innerHeight;
+    atmo.style.transform = `translate3d(0,${top}px,0)`;
+  };
+  ScrollTrigger.create({ trigger: hero, start: 'top top', end: 'bottom top', onUpdate: placeAtmo, onRefresh: placeAtmo });
 }
 
 // ---------------------------------------------------------------- journey overlays
@@ -90,9 +96,9 @@ function setupJourney(journey) {
       seqWrap.style.setProperty('--gh', `${Math.max(0, H - (y + h * g))}px`);
     },
   });
-  // whole of phase A (journey.js A_END = 0.28); the fade happens just after it, while the live
+  // whole of phase A (journey.js A_END = 0.42); the fade happens just after it, while the live
   // scene is still holding the sequence's last framing
-  const SEQ_END = 0.29, SEQ_PLAY = 0.28;
+  const SEQ_END = 0.43, SEQ_PLAY = 0.42;
   let cardsMax = 0;
   const measure = () => { cardsMax = Math.max(0, cards.scrollWidth - innerWidth + 40); };
   measure();
@@ -108,18 +114,19 @@ function setupJourney(journey) {
       seqWrap.style.opacity = so;
       seqWrap.style.visibility = so > 0 ? 'visible' : 'hidden';
       // B: services panel
-      const show = range(P, 0.3, 0.37) - range(P, 0.6, 0.65);
+      // timings measured off the reference (fractions of the section)
+      const show = range(P, 0.46, 0.52) - range(P, 0.69, 0.72);
       panel.style.transform = `translateY(${(1 - show) * 105}%)`;
       panel.style.visibility = show > 0 ? 'visible' : 'hidden';   // its glow otherwise peeks in at the bottom
-      cards.style.transform = `translateX(${-range(P, 0.37, 0.59) * cardsMax}px)`;
-      giant.style.opacity = range(P, 0.25, 0.3) - range(P, 0.6, 0.64);
-      giant.style.transform = `translateX(${-range(P, 0.25, 0.64) * 55}%)`;
-      speed.style.opacity = range(P, 0.27, 0.3);
+      cards.style.transform = `translateX(${-range(P, 0.53, 0.69) * cardsMax}px)`;
+      giant.style.opacity = range(P, 0.44, 0.48) - range(P, 0.69, 0.71);
+      giant.style.transform = `translateX(${-range(P, 0.44, 0.72) * 55}%)`;
+      speed.style.opacity = range(P, 0.42, 0.45);
       // C: reliability overlay
       // text only appears once the truck has turned and the junction has left the screen
-      const r = range(P, 0.75, 0.79);
+      const r = range(P, 0.82, 0.85);
       rel.style.opacity = r;
-      const idx = Math.min(feats.length - 1, Math.floor(range(P, 0.79, 0.99) * feats.length));
+      const idx = Math.min(feats.length - 1, Math.floor(range(P, 0.85, 0.99) * feats.length));
       feats.forEach((f, i) => f.classList.toggle('on', r > 0.5 && i === idx));
     },
   });
@@ -184,7 +191,10 @@ async function boot() {
     // ship: pre-rendered Blender sequence (top-down, climbs into the clouds)
     sequencePlayer($('#shipCanvas'), { dir: 'seq/ship', count: 200, fit: 'cover', lazy: true }),
     // jet: pre-rendered Blender sequence on a transparent background
-    sequencePlayer($('#planeCanvas'), { dir: 'seq/plane', count: 180, bleed: 0.6, lazy: true }),
+    sequencePlayer($('#planeCanvas'), {
+      dir: 'seq/plane', count: 180, bleed: 0.6, lazy: true,
+      shadow: { dx: 0.07, dy: 0.1, blur: 14, alpha: 0.22 },   // soft grey shadow on the page, like the reference
+    }),
     plMapReady,
   ]);
 

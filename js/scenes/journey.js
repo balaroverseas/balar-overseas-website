@@ -6,7 +6,8 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { createStage, makeContainer, buildTruck, buildWheel, canvasTex, seg, lerp, clamp01 } from './util.js';
 
-const A_END = 0.28, B_END = 0.62;
+// phase boundaries measured off the reference: port/stacker → services panel → road
+const A_END = 0.42, B_END = 0.71;
 const range = (p, a, b) => clamp01((p - a) / (b - a));
 const ease = (t) => t * t * (3 - 2 * t);
 
@@ -225,7 +226,7 @@ export function initJourney(canvas, onSpeed) {
   scene.add(box);
 
   // same livery as the Blender truck the sequence hands over from
-  const truck = buildTruck({ cab: '#eef0f3', trim: '#3b2cff', skirt: '#3b2cff' });
+  const truck = buildTruck({ cab: '#1a1c21', trim: '#3b2cff', skirt: '#3b2cff' });
   scene.add(truck);
 
   // ---------- helpers
@@ -236,19 +237,27 @@ export function initJourney(canvas, onSpeed) {
   };
   const mixF = (a, b, t) => ({ x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t), h: lerp(a.h, b.h, t), D: lerp(a.D, b.D, t) });
   const sideTruckFrame = (tx) => {
-    const f = frame(tx + 0.3, 0, 14.5);
-    f.y = 2.5 - 0.5 * f.h;   // truck sits in the upper part of the screen
+    // like the reference: truck smaller and left of centre (≈10–47% of the width), ground at 40%
+    const f = frame(tx + 8.8, 0, 21);
+    f.y = -0.2 * f.h;
     return f;
   };
-  // Same framing as the last Blender frame on the page (see main.js: 1440px frames, 30 m wide,
-  // ground line pinned at 90% of the screen, camera trailing the truck by 5.2 m), so the
-  // hand-over from the image sequence to this live scene is invisible.
+  // Same framing as the last Blender frame as main.js draws it (frames scaled to
+  // min(1.15·W/1440, H/810), point 87% down the frame pinned at 90% of the screen), using the
+  // width / truck offset / ground line Blender wrote to meta.json — so the hand-over from the
+  // image sequence to this live scene is invisible.
+  let seqEnd = { width: 29, dx: 1.05, ground: 0.6 };
+  fetch('seq/stacker/meta.json').then((r) => r.json()).then((m) => {
+    if (m.end) seqEnd = { width: m.end.width, dx: m.end.dx, ground: m.ground[m.ground.length - 1] };
+  }).catch(() => {});
   const seqFrame = (tx) => {
     const W = innerWidth, H = innerHeight;
     const sc = Math.min((W * 1.15) / 1440, H / 810);
-    const mpp = 30 / (1440 * sc);              // metres per CSS pixel
+    const iw = 1440 * sc, ih = 810 * sc;
+    const mpp = seqEnd.width / iw;             // metres per CSS pixel
+    const groundY = H * 0.9 - ih * 0.87 + ih * seqEnd.ground;
     const h = 0.5 * H * mpp;
-    return { x: tx - 5.2, y: 0.4 * H * mpp, h, D: h / tanH };
+    return { x: tx - seqEnd.dx, y: (groundY - 0.5 * H) * mpp, h, D: h / tanH };
   };
   // The truck keeps to its own (right-hand) lane: +Z while heading +X, -X while heading +Z.
   const LANE = 2.25;
@@ -285,7 +294,7 @@ export function initJourney(canvas, onSpeed) {
     if (P < A_END) tx = lerp(-60, XC + 1.1, truckArrive);
     else if (P < B_END) { tx = XC + 1.1 + 260 * Math.pow(b, 1.35); tz = LANE * seg(b, 0.15, 0.6); }
     else {
-      const p = pathAt(c * 340);
+      const p = pathAt(c * 230);   // the turn comes at ~0.8 of the section, like the reference
       tx = p.x; tz = p.z; heading = p.a;
     }
     truck.position.set(tx, 0, tz);
@@ -355,7 +364,7 @@ export function initJourney(canvas, onSpeed) {
       f = mixF(seqFrame(tx), sideTruckFrame(tx), seg(b, 0.03, 0.1));
     }
 
-    const orbit = P >= B_END ? ease(range(c, 0, 0.22)) * (Math.PI / 2) : 0;
+    const orbit = P >= B_END ? ease(range(c, 0, 0.07)) * (Math.PI / 2) : 0;   // top view by ~0.73
     const topH = 19, topD = topH / tanH;
     const fwd = new THREE.Vector3(Math.cos(heading), 0, Math.sin(heading));
     // frame the road centre (not the truck) so the road stays in the middle of the screen

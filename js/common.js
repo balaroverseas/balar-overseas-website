@@ -124,6 +124,7 @@ export function initCommon({ startStopped = false } = {}) {
 
   // Header: colour follows the section underneath, hides while scrolling down
   const head = $('.site-head');
+  head.classList.add('at-top');
   let lastY = 0;
   const themeProbe = () => {
     const probe = document.elementsFromPoint(innerWidth / 2, 80).find((el) => el.closest('[data-theme]') && !el.closest('.site-head') && !el.closest('.pt'));
@@ -136,6 +137,7 @@ export function initCommon({ startStopped = false } = {}) {
       const y = s.scroll();
       head.classList.toggle('hide', y > 300 && y > lastY + 2 && !menu.classList.contains('open'));
       if (y < lastY - 2) head.classList.remove('hide');
+      head.classList.toggle('at-top', y < 120);
       lastY = y;
       themeProbe();
     },
@@ -210,7 +212,25 @@ export function setupCurves() {
   });
 }
 
+const FOOT_LISTS = {
+  ind: ['Home & Kitchenware', 'Health & Personal Care', 'Baby Products', 'Beauty Products', 'Home & Office Furniture', 'Mobile Accessories', 'Sports & Fitness', 'Toys & Games', 'Electronics'],
+  svc: ['Market Research', 'Product Sourcing', 'Price Negotiation', 'Quality Control', 'Loading & Warehousing', 'Sea & Air Freight', 'Customs Clearance', 'Door-to-door Delivery'],
+};
+
 export function setupFooter() {
+  // industries / services marquee with tabs (the list is doubled so the loop is seamless)
+  const track = $('#fTrack');
+  const fill = (key) => {
+    const row = FOOT_LISTS[key].map((s) => `<span>${s} –</span>`).join('');
+    track.innerHTML = row + row;
+  };
+  if (track) {
+    fill('ind');
+    $$('.f-tabbar button').forEach((b) => b.addEventListener('click', () => {
+      $$('.f-tabbar button').forEach((x) => x.classList.toggle('on', x === b));
+      fill(b.dataset.t);
+    }));
+  }
   const map = $('#footMap');
   if (map) drawDotMap(map, { gap: 9, dot: 3, color: '#dadada', markers: [{ lat: 21.17, lon: 72.83, color: '#3b2cff' }, { lat: 23.13, lon: 113.26, color: '#3b2cff' }] }).catch(() => {});
   const pts = $('#footParticles');

@@ -10,9 +10,9 @@ from lib import box, cylinder, profile, arc, mat, wheel, empty, text, hazard
 DECK = 1.5          # top of the twistlocks = container bottom
 
 
-def build_truck(name='truck', loc=(0, 0, 0), parent=None):
+def build_truck(name='truck', loc=(0, 0, 0), parent=None, cab_color='#eef0f3'):
     root = empty(name, loc, parent)
-    cab_paint = mat('cab_white', '#eef0f3', metal=0.2, rough=0.28, coat=1.0, coat_rough=0.05)
+    cab_paint = mat('cab_paint', cab_color, metal=0.5, rough=0.32, coat=0.35, coat_rough=0.12)
     accent = mat('balar_indigo', '#3b2cff', metal=0.3, rough=0.3, coat=1.0, coat_rough=0.05)
     orange = mat('balar_orange', '#ff8a3d', metal=0.2, rough=0.35, coat=0.8)
     dark = mat('truck_dark', '#1d2127', metal=0.4, rough=0.45, coat=0.3)
