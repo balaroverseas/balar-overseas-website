@@ -177,42 +177,96 @@ export function initJourney(canvas, onSpeed) {
   shadowCatcher.rotation.x = -Math.PI / 2; shadowCatcher.position.y = -0.02; shadowCatcher.receiveShadow = true;
   scene.add(shadowCatcher);
 
+  // ---------- Road network, measured off the reference's top view (1280×720, section 0.77–1.0):
+  // every road is three 4.8 m lanes (two grey dashed lane lines), ~0.87× the truck's length.
+  // Road A runs along +X; at the junction it bends in a smooth S into road B (further +X) and
+  // branches down into road C (+Z), with a hatched gore where they split. The truck keeps to
+  // the middle lane and turns from A into C. Screen right = +X, screen down = +Z (top view).
+  const RW = 14.4, LW = RW / 3;
   const XB = 4.1 + 260;            // truck x at end of phase B
-  const L1 = 72, R = 9;          // straight run then a right turn
-  const XJ = XB + L1;              // x of the crossing road
-  const roadMat = new THREE.MeshStandardMaterial({ color: '#0b0b0b', roughness: 0.9 });
-  const slab = new THREE.Mesh(new THREE.BoxGeometry(XJ + 260, 80, 9), roadMat);
-  slab.position.set((XJ + 260) / 2 - 80, -40, 0);
+  const L1 = 100;                  // straight run on road A before the bend
+  const XJ = XB + L1;              // road A starts to bend here
+  const K = RW / 66;               // reference sketch (px at the zoomed-out frame) → metres
+  const J = (px, py) => new THREE.Vector2(XJ + (px - 150) * K, (py - 70) * K);
+  const CX = J(229.5, 0).x, CZ0 = J(0, 165).y;      // road C centreline x, start z
+  const FAR = 420;
+  // flat near-black like the reference (unlit, so it never turns grey under the lights)
+  const roadMat = new THREE.MeshBasicMaterial({ color: '#111111', toneMapped: false, side: THREE.DoubleSide });
+  // road A is a deep slab: from the side its face is the black ground band, from above it is the road
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(XJ + 82, 80, RW), roadMat);
+  slab.position.set((XJ + 2 - 80) / 2, -40, 0);
   slab.receiveShadow = true;
   scene.add(slab);
-  const vRoad = new THREE.Mesh(new THREE.PlaneGeometry(9, 900).rotateX(-Math.PI / 2), roadMat);
-  vRoad.position.set(XJ + R, 0.005, 250);
-  vRoad.receiveShadow = true;
-  scene.add(vRoad);
+  // junction + roads B and C as one flat shape
+  const sh = new THREE.Shape();
+  const JP = (px, py) => J(px, py);
+  let p = JP(140, 37); sh.moveTo(p.x, p.y);
+  p = JP(150, 37); sh.lineTo(p.x, p.y);
+  { const c1 = JP(220, 37), c2 = JP(230, 100), e = JP(290, 100); sh.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, e.x, e.y); }
+  sh.lineTo(XJ + 300, JP(0, 100).y);
+  sh.lineTo(XJ + 300, JP(0, 165).y);
+  p = JP(272, 165); sh.lineTo(p.x, p.y);
+  { const c = JP(262, 165), e = JP(262, 175); sh.quadraticCurveTo(c.x, c.y, e.x, e.y); }
+  sh.lineTo(JP(262, 0).x, FAR);
+  sh.lineTo(JP(197, 0).x, FAR);
+  p = JP(197, 165); sh.lineTo(p.x, p.y);
+  { const c1 = JP(197, 130), c2 = JP(185, 103), e = JP(150, 103); sh.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, e.x, e.y); }
+  p = JP(140, 103); sh.lineTo(p.x, p.y);
+  const junction = new THREE.Mesh(new THREE.ShapeGeometry(sh, 32).rotateX(Math.PI / 2), roadMat);
+  junction.position.y = 0.004;
+  junction.receiveShadow = true;
+  scene.add(junction);
 
-  // dashed lane markings (instanced)
-  const dashGeo = new THREE.PlaneGeometry(2.2, 0.22).rotateX(-Math.PI / 2);
-  const dashMat = new THREE.MeshBasicMaterial({ color: '#8a8a8a' });
-  const dashes = [];
-  for (let x = XB - 120; x < XJ + 250; x += 5) if (Math.abs(x - (XJ + R)) > 7) dashes.push([x, 0, 0]);
-  for (let z = -200; z < 700; z += 5) if (Math.abs(z) > 7) dashes.push([XJ + R, z, Math.PI / 2]);
-  const inst = new THREE.InstancedMesh(dashGeo, dashMat, dashes.length);
-  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), one = new THREE.Vector3(1, 1, 1);
-  dashes.forEach(([x, z, r], i) => {
-    q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), r);
-    m4.compose(new THREE.Vector3(x, 0.02, z), q, one);
+  // lane markings: dashes laid along curves (2.4 m dash, 4.2 m gap), solid edge lines, gore hatch
+  const V = (x, z) => new THREE.Vector2(x, z);
+  const marks = [];   // [x, z, angle, length, width]
+  const dashed = (curve, dash = 2.4, gap = 4.2) => {
+    const len = curve.getLength();
+    for (let d = gap / 2; d + dash < len; d += dash + gap) {
+      const u = (d + dash / 2) / len, q2 = curve.getPointAt(u), tg = curve.getTangentAt(u);
+      marks.push([q2.x, q2.y, Math.atan2(tg.y, tg.x), dash, 0.22]);
+    }
+  };
+  const solid = (a2, b2, w = 0.16) => {
+    const mx = (a2.x + b2.x) / 2, mz = (a2.y + b2.y) / 2;
+    marks.push([mx, mz, Math.atan2(b2.y - a2.y, b2.x - a2.x), a2.distanceTo(b2), w]);
+  };
+  const line = (a2, b2) => new THREE.LineCurve(a2, b2);
+  // road A
+  dashed(line(V(-80, -LW / 2), V(XJ, -LW / 2)));
+  dashed(line(V(-80, LW / 2), V(XJ, LW / 2)));
+  // road B
+  const zB1 = JP(0, 121.7).y, zB2 = JP(0, 143.3).y, xB0 = JP(290, 0).x;
+  dashed(line(V(xB0, zB1), V(XJ + 300, zB1)));
+  dashed(line(V(xB0, zB2), V(XJ + 300, zB2)));
+  // road C
+  const xC1 = JP(218.7, 0).x, xC2 = JP(240.3, 0).x;
+  dashed(line(V(xC1, CZ0), V(xC1, FAR)));
+  dashed(line(V(xC2, CZ0), V(xC2, FAR)));
+  // through the junction: A → C (concentric) and A → B (S-bends)
+  dashed(new THREE.QuadraticBezierCurve(V(XJ, -LW / 2), V(xC2, -LW / 2), V(xC2, CZ0)));
+  dashed(new THREE.QuadraticBezierCurve(V(XJ, LW / 2), V(xC1, LW / 2), V(xC1, CZ0)));
+  dashed(new THREE.CubicBezierCurve(V(XJ, -LW / 2), V(XJ + 15, -LW / 2), V(XJ + 15, zB1), V(xB0, zB1)));
+  dashed(new THREE.CubicBezierCurve(V(XJ, LW / 2), V(XJ + 15, LW / 2), V(XJ + 15, zB2), V(xB0, zB2)));
+  // thin edge lines just inside the kerbs of the straight runs
+  const e = RW / 2 - 0.45;
+  solid(V(-80, -e), V(XJ, -e)); solid(V(-80, e), V(XJ, e));
+  solid(V(xB0, JP(0, 100).y + 0.45), V(XJ + 300, JP(0, 100).y + 0.45)); solid(V(xB0 + 6, JP(0, 165).y - 0.45), V(XJ + 300, JP(0, 165).y - 0.45));
+  solid(V(JP(197, 0).x + 0.45, CZ0 + 4), V(JP(197, 0).x + 0.45, FAR)); solid(V(JP(262, 0).x - 0.45, CZ0 + 4), V(JP(262, 0).x - 0.45, FAR));
+  // hatched gore where the lanes to B and to C split
+  const g1 = JP(236, 140), g2 = JP(262, 168), g3 = JP(281, 141);
+  solid(g1, g2); solid(g2, g3); solid(g3, g1);
+  for (let i = 1; i < 7; i++) solid(g1.clone().lerp(g2, i / 7), g1.clone().lerp(g3, i / 7), 0.12);
+  const markGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+  const markMat = new THREE.MeshBasicMaterial({ color: '#4a4a4a' });
+  const inst = new THREE.InstancedMesh(markGeo, markMat, marks.length);
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc3 = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+  marks.forEach(([x, z, ang, len, w], i) => {
+    q.setFromAxisAngle(up, -ang);
+    m4.compose(new THREE.Vector3(x, 0.03, z), q, sc3.set(len, 1, w));
     inst.setMatrixAt(i, m4);
   });
   scene.add(inst);
-  // zebra crossings around the junction
-  const zebraGeo = new THREE.PlaneGeometry(0.7, 3.2).rotateX(-Math.PI / 2);
-  const zebraMat = new THREE.MeshBasicMaterial({ color: '#5a5a5a' });
-  for (let i = -3; i <= 3; i++) {
-    const a = new THREE.Mesh(zebraGeo, zebraMat); a.position.set(XJ + R + i * 1.2, 0.02, -7.5); a.rotation.y = 0; scene.add(a);
-    const b = new THREE.Mesh(zebraGeo, zebraMat); b.position.set(XJ + R + i * 1.2, 0.02, 7.5); scene.add(b);
-    const c = new THREE.Mesh(zebraGeo, zebraMat); c.position.set(XJ + R - 7.5, 0.02, i * 1.2); c.rotation.y = Math.PI / 2; scene.add(c);
-  }
-
   // ---------- Port: stack + reach stacker (behind the truck lane at z = -6)
   const ZS = -6;
   const stackA = makeContainer('#1f3a8a', {}); stackA.rotation.y = Math.PI / 2; stackA.position.set(9.6, 1.3, ZS); scene.add(stackA);
@@ -259,19 +313,19 @@ export function initJourney(canvas, onSpeed) {
     const h = 0.5 * H * mpp;
     return { x: tx - seqEnd.dx, y: (groundY - 0.5 * H) * mpp, h, D: h / tanH };
   };
-  // The truck keeps to its own (right-hand) lane: +Z while heading +X, -X while heading +Z.
-  const LANE = 2.25;
+  // The truck keeps to the middle lane: along A, a smooth right turn, then down road C.
+  const turnCurve = new THREE.QuadraticBezierCurve(new THREE.Vector2(XJ, 0), new THREE.Vector2(CX, 0), new THREE.Vector2(CX, CZ0));
+  const TURN = turnCurve.getLength();
   const pathAt = (s) => {
-    const r = R - LANE;
-    if (s < L1) return { x: XB + s, z: LANE, a: 0 };
-    const arc = (Math.PI / 2) * r;
-    if (s < L1 + arc) {
-      const phi = (s - L1) / r;
-      return { x: XB + L1 + r * Math.sin(phi), z: R - r * Math.cos(phi), a: phi };
+    if (s < L1) return { x: XB + s, z: 0, a: 0 };
+    if (s < L1 + TURN) {
+      const u = (s - L1) / TURN, pt = turnCurve.getPointAt(u), tg = turnCurve.getTangentAt(u);
+      return { x: pt.x, z: pt.y, a: Math.atan2(tg.y, tg.x) };
     }
-    return { x: XJ + R - LANE, z: R + (s - L1 - arc), a: Math.PI / 2 };
+    return { x: CX, z: CZ0 + (s - L1 - TURN), a: Math.PI / 2 };
   };
-
+  // reference pacing (fractions of phase C): straight until 0.43, turn 0.43–0.55, then road C
+  const pathS = (c) => (c < 0.43 ? L1 * (c / 0.43) : c < 0.55 ? L1 + TURN * ((c - 0.43) / 0.12) : L1 + TURN + 110 * ((c - 0.55) / 0.45));
   const tmp = new THREE.Vector3(), boxOnTruck = new THREE.Vector3(-1.1, 2.9, 0);
   let target = 0, P = 0, prevTruckX = null, prevTruckZ = null, lastSpeed = -1;
 
@@ -292,10 +346,10 @@ export function initJourney(canvas, onSpeed) {
     // truck x (A arrives, B drives) and path (C)
     let tx, tz = 0, heading = 0;
     if (P < A_END) tx = lerp(-60, XC + 1.1, truckArrive);
-    else if (P < B_END) { tx = XC + 1.1 + 260 * Math.pow(b, 1.35); tz = LANE * seg(b, 0.15, 0.6); }
+    else if (P < B_END) tx = XC + 1.1 + 260 * Math.pow(b, 1.35);
     else {
-      const p = pathAt(c * 230);   // the turn comes at ~0.8 of the section, like the reference
-      tx = p.x; tz = p.z; heading = p.a;
+      const pp = pathAt(pathS(c));
+      tx = pp.x; tz = pp.z; heading = pp.a;
     }
     truck.position.set(tx, 0, tz);
     truck.rotation.y = -heading;
@@ -365,11 +419,14 @@ export function initJourney(canvas, onSpeed) {
     }
 
     const orbit = P >= B_END ? ease(range(c, 0, 0.07)) * (Math.PI / 2) : 0;   // top view by ~0.73
-    const topH = 19, topD = topH / tanH;
-    const fwd = new THREE.Vector3(Math.cos(heading), 0, Math.sin(heading));
-    // frame the road centre (not the truck) so the road stays in the middle of the screen
-    const center = new THREE.Vector3(tx + LANE * Math.sin(heading), 1.5, tz - LANE * Math.cos(heading) * seg(b, 0.15, 0.6)).addScaledVector(fwd, 0.3);
-    if (orbit > 0) {
+    // top view, measured off the reference: zoomed so the road fills 60% of the height while on
+    // road A (truck at ~41% across), pulls out to ~2.35× (whole junction) for the turn, then
+    // follows the truck down road C until it sits mid-screen
+    const topH = lerp(12, 28.25, seg(c, 0.35, 0.48)), topD = topH / tanH;
+    const center = new THREE.Vector3(tx + 3.8 * (topH / 12), 1.5, tz);
+    const jView = J(230, 130);
+    center.lerp(new THREE.Vector3(jView.x, 1.5, jView.y), seg(c, 0.35, 0.48));
+    center.lerp(new THREE.Vector3(tx, 1.5, tz - 7.6 * (1 - ease(range(c, 0.55, 1)))), seg(c, 0.5, 0.6));    if (orbit > 0) {
       const k = orbit / (Math.PI / 2);
       const D = lerp(f.D, topD, k);
       const offY = lerp(f.y - 1.5, 0, k);

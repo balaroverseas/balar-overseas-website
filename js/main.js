@@ -82,7 +82,7 @@ function setupHero(globe) {
 function setupJourney(journey) {
   const sec = $('#services');
   const giant = $('#jGiant'), panel = $('#jPanel'), cards = $('#jCards'), rel = $('#jRel'), speed = $('.j-speed');
-  const feats = $$('.j-feat');
+  const feats = $$('.j-feat'), relTitle = $('#jRel h2');
   // Blender stacker render plays over the first part of phase A, then hands over to the live scene
   const seqWrap = $('#jSeq');
   // frames are placed so the resting ground line (87% down) sits at 90% of the screen; the black
@@ -127,10 +127,12 @@ function setupJourney(journey) {
       speed.style.opacity = range(P, 0.42, 0.45);
       // C: reliability overlay
       // text only appears once the truck has turned and the junction has left the screen
-      const r = range(P, 0.82, 0.85);
-      rel.style.opacity = r;
-      const idx = Math.min(feats.length - 1, Math.floor(range(P, 0.85, 0.99) * feats.length));
-      feats.forEach((f, i) => f.classList.toggle('on', r > 0.5 && i === idx));
+      // measured off the reference (1280×720): heading enters at ~0.855 and parks at 15.5% by
+      // 0.92; features follow each other 51% of the screen apart, first one at 75% at 0.9
+      const H = innerHeight;
+      rel.style.opacity = P > 0.845 ? 1 : 0;
+      relTitle.style.transform = `translateY(${H * (1 - 0.845 * range(P, 0.855, 0.92))}px)`;
+      feats.forEach((f, i) => { f.style.transform = `translateY(${H * (0.75 - 11.1 * (P - 0.9) + 0.51 * i)}px)`; });
     },
   });
 }

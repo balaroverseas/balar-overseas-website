@@ -64,8 +64,13 @@ export function createStage(canvas, opts = {}) {
   renderer.setAnimationLoop(() => {
     const dt = Math.min(clock.getDelta(), 0.05);
     if (!stage.visible) return;
-    if (stage.onFrame) stage.onFrame(clock.elapsedTime, dt);
-    renderer.render(scene, camera);
+    // one bad frame must never stop the scene: report once and keep looping
+    try {
+      if (stage.onFrame) stage.onFrame(clock.elapsedTime, dt);
+      renderer.render(scene, camera);
+    } catch (err) {
+      if (!stage.failed) { stage.failed = true; console.error('[3D] frame error', err); window.__sceneError = String(err && err.stack || err); }
+    }
   });
   return stage;
 }
