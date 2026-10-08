@@ -6,7 +6,7 @@ export function initRoadHero(canvas) {
   const stage = createStage(canvas, { fov: 30, shadows: true, far: 2000, maxDpr: 1.5 });
   const { scene, camera } = stage;
   camera.up.set(0, 0, -1);
-  scene.background = new THREE.Color('#1d3a22');
+  scene.background = new THREE.Color('#142a15');
 
   scene.add(new THREE.HemisphereLight('#e8f4ff', '#20361f', 1.0));
   const sun = new THREE.DirectionalLight('#fff3dc', 2.4);
@@ -18,7 +18,7 @@ export function initRoadHero(canvas) {
 
   const LEN = 1200;
   // forest floor
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, LEN).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#24401f', roughness: 1 }));
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, LEN).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#16301a', roughness: 1 }));
   ground.receiveShadow = true;
   scene.add(ground);
   // road with shoulders, edge lines and centre dashes
@@ -37,19 +37,28 @@ export function initRoadHero(canvas) {
 
   // trees: instanced low-poly crowns with colour variation
   const rand = seeded(11);
-  const crownGeo = new THREE.IcosahedronGeometry(1, 1);
-  const crownMat = new THREE.MeshStandardMaterial({ roughness: 0.9, flatShading: true });
-  const COUNT = 7000;
+  // lumpy, smooth-shaded crowns (noise-displaced sphere) read as real canopy from above
+  const crownGeo = new THREE.IcosahedronGeometry(1, 3);
+  const pos = crownGeo.attributes.position, v = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i);
+    const n = 1 + 0.16 * Math.sin(v.x * 5.1 + v.y * 3.3) * Math.cos(v.z * 4.7 - v.y * 2.1) + 0.08 * Math.sin(v.x * 11 + v.z * 9);
+    v.multiplyScalar(n);
+    pos.setXYZ(i, v.x, v.y, v.z);
+  }
+  crownGeo.computeVertexNormals();
+  const crownMat = new THREE.MeshStandardMaterial({ roughness: 0.95 });
+  const COUNT = 11000;
   const trees = new THREE.InstancedMesh(crownGeo, crownMat, COUNT);
   trees.castShadow = true;
   trees.receiveShadow = true;
-  const greens = ['#2f5d2a', '#3b6e2f', '#4c7f35', '#2a4f27', '#5a8c3a', '#365f2e', '#6b9a44'].map((c) => new THREE.Color(c));
+  const greens = ['#1d3a1b', '#264823', '#2f5629', '#1a331a', '#3a6330', '#22421f', '#4a7238'].map((c) => new THREE.Color(c));
   const q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
   for (let i = 0; i < COUNT; i++) {
     const side = rand() < 0.5 ? -1 : 1;
-    const x = side * (8.2 + Math.pow(rand(), 0.85) * 85);
+    const x = side * (8.6 + Math.pow(rand(), 0.9) * 85);
     const z = -LEN / 2 + rand() * LEN;
-    const r = 1.6 + rand() * 2.4;
+    const r = 2.0 + rand() * 2.8;
     p.set(x, r * 0.9 + rand() * 2, z);
     q.setFromEuler(new THREE.Euler(rand() * 3, rand() * 3, rand() * 3));
     s.set(r, r * (0.75 + rand() * 0.3), r);
@@ -67,7 +76,8 @@ export function initRoadHero(canvas) {
   let target = 0, prog = 0, prevZ = null;
   stage.onFrame = (t, dt) => {
     prog = THREE.MathUtils.damp(prog, target, 5, dt);
-    const z = lerp(160, -260, prog);
+    // like the reference: the truck stays around the middle of the screen while the forest rolls by
+    const z = lerp(100, -170, prog) + 6 - 14 * prog;
     truck.position.set(2.3, 0, z);
     if (prevZ !== null) truck.userData.spin(prevZ - z);
     prevZ = z;
