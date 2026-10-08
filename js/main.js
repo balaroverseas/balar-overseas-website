@@ -91,6 +91,9 @@ function setupJourney(journey) {
   fetch('seq/stacker/meta.json').then((r) => r.json()).then((m) => { ground = m.ground; }).catch(() => {});
   const seq = sequencePlayer($('#stackSeq'), {
     dir: 'seq/stacker', count: 300, bleed: 0.15, anchor: [0.87, 0.9],
+    // the reference shows the port scene smaller at first and closes in as the box turns:
+    // draw the opening frames at 72% and grow to full size by the time the truck arrives
+    scaleAt: (i) => 0.72 + 0.28 * Math.min(1, Math.max(0, (i - 95) / 85)) ** 2 * (3 - 2 * Math.min(1, Math.max(0, (i - 95) / 85))),
     onLayout: ({ y, h, H, frame }) => {
       const g = ground ? ground[frame] : 0.87;
       seqWrap.style.setProperty('--gh', `${Math.max(0, H - (y + h * g))}px`);

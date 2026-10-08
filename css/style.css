@@ -317,7 +317,7 @@ footer{background:#fff;padding-top:3vw;overflow:hidden}
   .hero-copy{right:var(--pad);bottom:8vh}
   .intro-grid,.drives-grid,.f-top,.f-mid,.testi-head{grid-template-columns:1fr}
   .intro-left,.drives-left{position:static}
-  .intro-title{max-width:none}.intro-left{padding-top:0}.intro-img{width:60%}
+  .intro-title{max-width:none}.intro-left{padding-top:0}.intro-img{width:60%}.intro-grid{row-gap:28px}
   .intro-img{margin-bottom:40px}
   .faq-grid{grid-template-columns:1fr}
   .j-panel{top:40%}
