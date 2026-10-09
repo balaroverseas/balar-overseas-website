@@ -27,105 +27,101 @@ s = lib.reset(samples=args.samples, res=(rx, ry), transparent=True)
 s.frame_start, s.frame_end = 1, 150
 
 # ----------------------------------------------------------------------------- materials
-paint = mat('stacker_blue', '#155a9c', metal=0.35, rough=0.32, coat=1.0, coat_rough=0.06)
-paint_dark = mat('stacker_dark', '#22262c', metal=0.4, rough=0.42, coat=0.5)
-boom_paint = mat('boom', '#2b3036', metal=0.45, rough=0.38, coat=0.8)
-steel = mat('steel', '#c9ced6', metal=1.0, rough=0.18)
-glass = mat('glass', '#1b2a36', metal=0.0, rough=0.02, transmission=0.85, coat=1.0)
-seat = mat('seat', '#2a2a2a', rough=0.8)
-yellow = mat('yellow', '#f2c230', rough=0.35, coat=0.8)
-haz = lib.hazard()
-lamp = mat('lamp', '#ffffff', emit='#fff4dc', emit_strength=6)
-beacon_m = mat('beacon', '#ffb020', emit='#ff8a00', emit_strength=8)
-white_txt = mat('white_txt', '#ffffff', rough=0.4)
+# The machine is the user's own reach-stacker model (3MF, imported by import3mf.py into
+# assets/stacker_user.blend), scaled to life size and rigged for the shot: boom about its pivot pin,
+# telescopic section along the boom, lift cylinders following the boom, spreader on its own.
+ASSET = os.path.join(os.path.dirname(__file__), 'assets', 'stacker_user.blend')
+with bpy.data.libraries.load(ASSET) as (src_lib, dst_lib):
+    dst_lib.objects = list(src_lib.objects)
+parts = {}
+for o in dst_lib.objects:
+    s.collection.objects.link(o)
+    parts[int(o.name.split('_')[1])] = o
+for o in parts.values():                      # smoother look for the round parts
+    for p in o.data.polygons:
+        p.use_smooth = False
+S = 29.5                                      # print model → life size (Ø61 mm tyres → 1.8 m)
+CXM = 0.0975                                  # model x midway between the axles
 
-# ----------------------------------------------------------------------------- reach stacker
+
+def M(x, z, y=0.0):
+    """model point (mm-model metres) → stacker-local; the model is turned 180° to face +X"""
+    return Vector(((CXM - x) * S, -y * S, z * S))
+
+
 rs = empty('stacker', (-4.5, 0, 0))
+model = empty('model', (CXM * S, 0, 0), parent=rs)
+model.scale = (S, S, S)
+model.rotation_euler = (0, 0, math.pi)
+for o in parts.values():
+    o.parent = model
+# our lettering instead of the original decal on the boom
+for i in (70, 71):
+    bpy.data.objects.remove(parts.pop(i), do_unlink=True)
+bpy.context.view_layer.update()
 
-# lower chassis with wheel arches (dark)
-chassis = [(-5.4, 0.75)] + arc(-2.9, 0.85, 1.12, 180, 0) + arc(3.0, 1.0, 1.28, 180, 0) + [(4.9, 1.0), (4.9, 1.85), (-5.4, 1.85)]
-profile('chassis', chassis, 2.7, paint_dark, bevel=0.06, parent=rs)
-# main blue body: sloped engine hood at the rear, low deck in front of the cab
-body = [(-5.4, 1.7), (4.6, 1.7), (4.85, 2.2), (4.35, 2.6), (0.4, 2.6), (-0.4, 2.7), (-0.9, 4.25), (-1.3, 4.5), (-4.2, 4.55), (-5.1, 4.1), (-5.4, 3.4)]
-profile('body', body, 2.6, paint, bevel=0.12, segments=5, parent=rs)
-# counterweight with hazard band
-profile('counterweight', [(-6.2, 0.95), (-5.3, 0.95), (-5.3, 3.4), (-5.75, 3.55), (-6.2, 3.0)], 2.95, paint_dark, bevel=0.08, parent=rs)
-box('cw_hazard', (0.95, 3.0, 0.32), (-5.75, 0, 1.4), haz, bevel=0.02, parent=rs)
-# engine grille, exhaust, tail and head lights
-for i in range(6):
-    box(f'grille{i}', (2.2, 0.04, 0.07), (-3.1, -1.36, 2.35 + i * 0.22), paint_dark, bevel=0.01, parent=rs)
-cylinder('exhaust', 0.11, 1.2, (-2.1, 0.95, 5.05), steel, axis='Z', parent=rs, radius2=0.13)
-box('taillight', (0.06, 0.4, 0.25), (-6.23, -1.1, 2.6), mat('tail', '#ff2a1a', emit='#ff2010', emit_strength=4), bevel=0.01, parent=rs)
-box('headlight', (0.06, 0.42, 0.22), (4.88, -1.0, 2.0), lamp, bevel=0.01, parent=rs)
-# BALAR lettering on the hood
-lib.text('hood_logo', 'BALAR', 0.42, (-3.9, -1.33, 3.55), white_txt, parent=rs)
 
-# cab (towards the camera side): base, glass greenhouse, roof, frame, seat, beacon, work lights
-cab_y = -0.55
-profile('cab_base', [(0.0, 2.6), (2.6, 2.6), (2.8, 2.9), (2.8, 3.1), (0.0, 3.1)], 1.9, paint, y=cab_y, bevel=0.06, parent=rs)
-profile('cab_glass', [(0.08, 3.1), (2.7, 3.1), (3.0, 5.05), (2.75, 5.35), (0.15, 5.35), (-0.05, 5.1)], 1.8, glass, y=cab_y, bevel=0.04, parent=rs)
-profile('cab_roof', [(-0.15, 5.3), (2.9, 5.3), (3.15, 5.55), (-0.05, 5.62)], 2.05, paint, y=cab_y, bevel=0.06, parent=rs)
-for x, yy, tilt in ((0.0, -1.42, 0.0), (0.0, 0.32, 0.0), (2.83, -1.42, -0.15), (2.83, 0.32, -0.15)):
-    p = box('pillar', (0.1, 0.1, 2.3), (x, yy, 4.22), paint_dark, bevel=0.015, parent=rs)
-    p.rotation_euler = (0, tilt, 0)
-box('seat', (0.8, 0.8, 0.9), (0.9, cab_y, 3.55), seat, bevel=0.08, parent=rs)
-cylinder('wheel_steer', 0.28, 0.05, (2.0, cab_y, 3.85), paint_dark, axis='X', parent=rs).rotation_euler = (0, 1.1, 0)
-cylinder('beacon', 0.14, 0.32, (1.1, cab_y, 5.8), beacon_m, axis='Z', parent=rs)
-for x in (0.25, 2.6):
-    box('worklight', (0.3, 0.22, 0.18), (x, -1.5, 5.62), lamp, bevel=0.02, parent=rs)
-box('mirror', (0.05, 0.32, 0.5), (3.2, -1.65, 4.4), paint_dark, bevel=0.01, parent=rs)
-for i, z in enumerate((1.05, 1.5)):
-    box(f'step{i}', (0.6, 0.35, 0.06), (-0.3 + i * 0.12, -1.55, z), steel, bevel=0.01, parent=rs)
-for x in (0.45, 1.3):
-    cylinder('rail', 0.04, 0.8, (x, -1.25, 3.05), yellow, axis='Z', parent=rs)
-cylinder('rail_top', 0.04, 1.0, (0.88, -1.25, 3.45), yellow, axis='X', parent=rs)
+def adopt(obj, new_parent):
+    mw = obj.matrix_world.copy()
+    obj.parent = new_parent
+    obj.matrix_parent_inverse = new_parent.matrix_world.inverted()
+    obj.matrix_world = mw
 
-# wheels: twin drive wheels at the front, singles at the rear (yellow port rims)
-for yy in (-1.0, -1.85, 1.0, 1.85):
-    wheel(f'wf{yy}', 0.95, 0.72, '#f2c230', (3.0, yy, 0.95), parent=rs)
-for yy in (-1.2, 1.2):
-    wheel(f'wr{yy}', 0.8, 0.62, '#f2c230', (-2.9, yy, 0.8), parent=rs)
 
-# boom: pivot on the hood, outer section + telescopic inner section + decal
-PIVOT = Vector((-2.4, 0, 4.55))
+PIVOT = M(0.194, 0.121)                       # boom pivot pin
+TIP0 = M(-0.1955, 0.389)                      # top of the spreader head = boom tip at rest
+A0, B0 = M(0.119, 0.196), M(0.029, 0.051)     # lift-cylinder pins: on the boom / on the chassis
+REST_ANG = math.atan2((TIP0 - PIVOT).z, (TIP0 - PIVOT).x)
+REST_LEN = (TIP0 - PIVOT).length
+U0 = (TIP0 - PIVOT).normalized()
+SP_H = (0.389 - 0.276) * S                    # spreader: twistlock bottom → head top
 boom = empty('boom', PIVOT, parent=rs)
-box('boom_outer', (9.0, 1.0, 1.1), (4.5, 0, 0), boom_paint, bevel=0.06, segments=4, parent=boom)
-box('boom_band', (5.4, 1.02, 0.14), (4.6, 0, 0.12), paint, bevel=0.01, parent=boom)
-lib.text('boom_logo', 'BALAR OVERSEAS', 0.38, (1.6, -0.52, -0.33), white_txt, parent=boom)
 inner = empty('boom_inner', (0, 0, 0), parent=boom)
-box('boom_inner_mesh', (10.0, 0.78, 0.84), (5.0, 0, 0), boom_paint, bevel=0.05, parent=inner)
-cylinder('pivot_pin', 0.45, 1.3, (0, 0, 0), steel, axis='Y', parent=boom)
-
-# twin lift cylinders (barrel + chrome rod), aligned every frame
-BASE = Vector((-0.6, 0, 2.6))
+bpy.context.view_layer.update()
+for i in (29, 35, 64, 57, 58, 59, 5, 6):
+    adopt(parts[i], boom)
+adopt(parts[36], inner)
+# lift cylinders: barrel + rod per side, turning about the chassis pin, rod sliding out
 rams = []
-for yy in (-0.62, 0.62):
-    barrel = cylinder(f'ram_barrel{yy}', 0.27, 2.8, (0, 0, 0), paint, axis='Z', parent=rs)
-    rod = cylinder(f'ram_rod{yy}', 0.14, 1.0, (0, 0, 0), steel, axis='Z', parent=rs)
-    for o, L in ((barrel, 2.8), (rod, 1.0)):
-        o.data.transform(__import__('mathutils').Matrix.Translation((0, 0, L / 2)))
-        o.rotation_mode = 'QUATERNION'
-    rams.append((barrel, rod, yy))
-
-# spreader (headblock + rotator + beam + hazard ends + twistlocks); local X = beam length
-sp = empty('spreader')
-box('sp_beam', (12.0, 0.9, 0.5), (0, 0, 0.3), paint_dark, bevel=0.04, parent=sp)
-for x in (-6.0, 6.0):
-    box('sp_end', (0.6, 2.6, 0.62), (x, 0, 0.3), haz, bevel=0.03, parent=sp)
-    for yy in (-1.15, 1.15):
-        box('twistlock', (0.4, 0.3, 0.3), (x, yy, 0.0), steel, bevel=0.02, parent=sp)
-for x in (-2.4, 2.4):
-    box('sp_cross', (0.25, 2.3, 0.25), (x, 0, 0.3), paint_dark, bevel=0.02, parent=sp)
-cylinder('rotator', 0.8, 0.5, (0, 0, 0.8), steel, axis='Z', parent=sp, radius2=0.7)
-box('headblock', (1.7, 1.4, 0.9), (0, 0, 1.45), paint_dark, bevel=0.1, parent=sp)
-
+for barrel_i, rod_i in ((13, 14), (32, 33)):
+    g = empty(f'cyl{barrel_i}', B0, parent=rs)
+    g.rotation_mode = 'QUATERNION'
+    rod_g = empty(f'rod{rod_i}', (0, 0, 0), parent=g)
+    bpy.context.view_layer.update()
+    adopt(parts[barrel_i], g)
+    adopt(parts[rod_i], rod_g)
+    rams.append((g, rod_g))
+CYL0 = A0 - B0
+# spreader: its own object, origin at the twistlock bottom centre, beam along local X
+sp = empty('spreader', M(-0.2115, 0.276))
+sp.parent = rs
+sp.rotation_euler = (0, 0, math.pi / 2)
+spfix = empty('spreader_fix', (0, 0, 0), parent=sp)
+spfix.rotation_euler = (0, 0, -math.pi / 2)
+bpy.context.view_layer.update()
+for i in (39, 69, 47, 3, 48, 49, 50, 17, 21, 22, 24, 23, 26, 27, 28, 11, 12):
+    adopt(parts[i], spfix)
+sp_world_rest = sp.matrix_world.copy()
+sp.parent = None
+sp.matrix_world = sp_world_rest
+white_txt = mat('white_txt', '#ffffff', rough=0.4)
+# BALAR on the camera-facing side of the red boom, along its axis (boom-local, pivot at origin)
+_perp = Vector((-U0.z, 0, U0.x))
+_p = U0 * 3.6 - _perp * 0.2 + Vector((0, -1.2, 0))
+t_ = lib.text('boom_logo', 'BALAR', 0.85, tuple(_p), white_txt, parent=boom)
+t_.rotation_euler = (math.pi / 2, -REST_ANG, 0)
+paint = mat('stacker_dummy', '#ffe900')
+# the model's paint is bright yellow/red: AgX would wash it out, so this scene uses Standard
+s.view_settings.view_transform = 'Standard'
+s.view_settings.look = 'None'
+s.view_settings.exposure = -0.25
 # ----------------------------------------------------------------------------- containers
 STACK_X = (7.6, 10.06)
 stack_roots = [container('stack_blue', '#1f3c8f', loc=(STACK_X[0], 0, 0)), container('stack_orange', '#d4632a', loc=(STACK_X[1], 0, 0))]
 for o in stack_roots:
     o.rotation_euler = (0, 0, math.pi / 2)
 stack = [c for o in stack_roots for c in [o] + list(o.children_recursive)]   # hide_render is per object
-hero = container('hero', '#b9bec5', label='BALAR OVERSEAS', label_color='#1e2328')
+hero = container('hero', '#9ea5ad', label='BALAR OVERSEAS', label_color='#1e2328')   # light grey like the reference
 
 # truck reverses in from the right (cab on the right, like the reference) under the container
 from truck import build_truck, DECK  # noqa: E402
@@ -181,7 +177,7 @@ def state(f):
     box_local.z = lerp(box_local.z, CARRY_LOW, seg(f, TURN[0], TURN[1] + 10))
     sp_local = box_local + Vector((0, 0, SP_UP))
     # before the pick the spreader comes down from a parked position onto the box
-    parked = Vector((8.5, 0, 9.8))
+    parked = TIP0 - Vector((0, 0, SP_H))      # boom at its modelled pose
     sp_local = parked.lerp(sp_local, seg(f, 8, 58)) if f < 60 else sp_local
     return rs_loc, th, sp_local, box_local
 
@@ -222,22 +218,21 @@ def apply(f):
     truck.location = (tx, BOX_Y, 0)
     for w, r in truck_wheels:
         w.rotation_euler = (0, -(tx - 40.0) / r, 0)
-    # boom IK in stacker-local space
-    tip = sp_local_now + Vector((0, 0, 1.9))
+    # boom IK (stacker-local): the spreader head top must sit at the boom tip
+    tip = sp_local_now + Vector((0, 0, SP_H))
     d = tip - PIVOT
-    ang = math.atan2(d.z, d.x)
-    boom.rotation_euler = (0, -ang, 0)
-    inner.location = (max(0.0, d.length - 10.0), 0, 0)
-    top = PIVOT + Vector((math.cos(ang) * 4.0, 0, math.sin(ang) * 4.0))
-    v = top - BASE
-    q = Vector((0, 0, 1)).rotation_difference(v.normalized())
-    for barrel, rod, yy in rams:
-        barrel.location = (BASE.x, yy, BASE.z)
-        barrel.rotation_quaternion = q
-        rod.location = Vector((BASE.x, yy, BASE.z)) + v.normalized() * 2.4
-        rod.rotation_quaternion = q
-        rod.scale = (1, 1, max(0.2, v.length - 2.4))
-    # camera: wide (stack on the right, ground at 90%) → pans/zooms onto the turned box →
+    delta = math.atan2(d.z, d.x) - REST_ANG
+    boom.rotation_euler = (0, -delta, 0)
+    inner.location = U0 * max(-4.0, d.length - REST_LEN)
+    # lift cylinders follow the boom pin
+    c_, s_ = math.cos(delta), math.sin(delta)
+    r = A0 - PIVOT
+    a_now = PIVOT + Vector((r.x * c_ - r.z * s_, 0, r.x * s_ + r.z * c_))
+    v = a_now - B0
+    q = CYL0.rotation_difference(v)
+    for g, rod_g in rams:
+        g.rotation_quaternion = q
+        rod_g.location = CYL0.normalized() * (v.length - CYL0.length)    # camera: wide (stack on the right, ground at 90%) → pans/zooms onto the turned box →
     # drops so the ground line sits at 60% with the loaded truck centred
     wide = (Vector((1.1, 0, 6.24)), 30.0)
     held = (Vector((RS_C + 1.0, BOX_Y, 5.6)), 26.0)
@@ -256,7 +251,7 @@ s.frame_end = LAST
 widths = []
 for f in range(1, LAST + 1):
     widths.append(apply(f))
-    for o in [rs, hero, sp, boom, inner, cam, tgt, truck] + [r for b in rams for r in b[:2]] + [w for w, _ in truck_wheels]:
+    for o in [rs, hero, sp, boom, inner, cam, tgt, truck] + [r for b in rams for r in b] + [w for w, _ in truck_wheels]:
         for path in ('location', 'rotation_euler', 'rotation_quaternion', 'scale'):
             try:
                 o.keyframe_insert(path, frame=f)
