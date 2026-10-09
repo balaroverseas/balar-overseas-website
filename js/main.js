@@ -95,8 +95,9 @@ function setupJourney(journey) {
   measure();
   addEventListener('resize', measure);
 
+  // P runs to 1 one screen before the section ends: that last screen is the ship sliding over
   ScrollTrigger.create({
-    trigger: sec, start: 'top top', end: 'bottom bottom',
+    trigger: sec, start: 'top top', end: 'bottom 200%',
     onUpdate: (s) => {
       const P = s.progress;
       journey && journey.setProgress(P);

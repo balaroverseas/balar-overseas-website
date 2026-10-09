@@ -134,7 +134,9 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .stat .lbl{margin-top:1.4vw;font-size:clamp(14px,1.39vw,24px);color:rgba(17,17,17,.72)}
 
 /* ---------- Journey ---------- */
-.journey{position:relative;height:1532vh;background:#fff}
+/* +100vh at the end: the road scene stays pinned (truck still on screen) while the ship section
+   slides up over it — like the reference, where the truck's box lines up with a box on the ship */
+.journey{position:relative;height:1632vh;background:#fff}
 .journey-sticky{position:sticky;top:0;height:100vh;height:100svh;overflow:hidden}
 #journeyCanvas{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:1}
 /* pre-rendered Blender stacker sequence; black ground band like the reference */
@@ -173,7 +175,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .curve.glow{overflow:visible;box-shadow:0 -30px 80px -10px rgba(59,44,255,.75),0 -6px 24px rgba(90,70,255,.9)}
 
 /* ---------- Ship ---------- */
-.ship{position:relative;height:850vh;background:#071d57}
+.ship{position:relative;z-index:3;margin-top:-100vh;margin-top:-100svh;height:850vh;background:#071d57}
 .ship-sticky{position:sticky;top:0;height:100vh;height:100svh;overflow:hidden;color:#fff}
 #shipCanvas{position:absolute;inset:0;width:100%;height:100%;display:block;background:#0a2466}
 /* title + cards scroll up over the ship as one block in the last third (reference: 2 columns

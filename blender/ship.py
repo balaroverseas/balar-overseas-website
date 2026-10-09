@@ -182,6 +182,10 @@ prism('foredeck', [(x * 0.9, y) for x, y in outline if y > 41] + [(-4.7, 41), (4
 # saturated like the reference (blues, magenta/pink, violet, red, orange, the odd white/green)
 PALETTE = ['#2a6fd6', '#e2508f', '#6a2bd8', '#d8342c', '#ff7a2a', '#1c3fae', '#c2185b', '#3022c9', '#1f8a3a', '#f0f0f0', '#4fa3f0', '#ff4f6a']
 roofs = [roof_mat(f'roof{i}', c) for i, c in enumerate(PALETTE)]
+# the truck's light-grey box stays on screen as the ship slides up under it: the centre column of
+# the bays that pass beneath it is the same grey, so the box seems to land on the ship (reference)
+truck_box = roof_mat('roof_truckbox', '#c4c9cf')
+TRUCK_COL, TRUCK_BAYS = 2, (0, 1, 2, 3)
 BAY_LEN, BRIDGE = 12.19, 1.5
 COLS = 5
 y = -50.0                                  # bays from the stern up to the forward bridge
@@ -192,7 +196,10 @@ for bay in range(6):
         x = (c - (COLS - 1) / 2) * 2.5
         tiers = max(2, tiers_base + rnd.choice((-1, 0, 0, 0, 1)))
         h = tiers * 2.59
-        box(f'stack{bay}_{c}', (2.44, BAY_LEN, h), (x, yc, DECK + 0.3 + h / 2), rnd.choice(roofs), bevel=0.04, segments=1, parent=ship)
+        m_ = rnd.choice(roofs)
+        if c == TRUCK_COL and bay in TRUCK_BAYS:
+            m_ = truck_box
+        box(f'stack{bay}_{c}', (2.44, BAY_LEN, h), (x, yc, DECK + 0.3 + h / 2), m_, bevel=0.04, segments=1, parent=ship)
     # hatch coaming under the stacks
     box(f'coaming{bay}', (COLS * 2.5 + 0.6, BAY_LEN + 0.4, 0.5), (0, yc, DECK + 0.1), rim_m, bevel=0.05, parent=ship)
     # lashing bridge forward of the bay
@@ -309,7 +316,7 @@ def apply(f):
     yy = lerp(-30, 10, seg(f, 1, 75))
     yy = lerp(yy, 4, seg(f, 75, 136))
     # the road it continues sits a touch right of centre on the page: start under it, settle centred
-    cam.location = (-0.6 * (1 - seg(f, 1, 40)), yy, z)
+    cam.location = (-0.15 * (1 - seg(f, 1, 40)), yy, z)       # centre column under the truck (635px)
     sea_map.inputs['Location'].default_value = (0, -t * 90, 0)   # water streams past: ship under way
     for fm in foam_maps:
         fm.inputs['Location'].default_value = (0, -t * 90, 0)
