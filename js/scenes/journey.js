@@ -56,7 +56,7 @@ export function initJourney(canvas, onSpeed) {
   const K = RW / 66;               // reference sketch (px at the zoomed-out frame) → metres
   const J = (px, py) => new THREE.Vector2(XJ + (px - 150) * K, (py - 70) * K);
   const CX = J(229.5, 0).x, CZ0 = J(0, 165).y;      // truck's line down road C, road C start z
-  const CL = 197, CR = 278;                          // road C kerbs (sketch x)
+  const CL = 197, CR = 262;                          // road C kerbs (sketch x): three lanes like A and B
   const FAR = 420;
   // flat near-black like the reference (unlit, so it never turns grey under the lights)
   const roadMat = new THREE.MeshBasicMaterial({ color: '#111111', toneMapped: false, side: THREE.DoubleSide });
@@ -73,8 +73,6 @@ export function initJourney(canvas, onSpeed) {
   { const c1 = JP(220, 37), c2 = JP(230, 100), e = JP(290, 100); sh.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, e.x, e.y); }
   sh.lineTo(XJ + 300, JP(0, 100).y);
   sh.lineTo(XJ + 300, JP(0, 165).y);
-  // road C is wider than A/B in the reference (≈1× the truck's length across, the truck running
-  // left of its centre): its right kerb sits at 278, not 262 like a plain three-lane road
   p = JP(CR + 10, 165); sh.lineTo(p.x, p.y);
   { const c = JP(CR, 165), e = JP(CR, 175); sh.quadraticCurveTo(c.x, c.y, e.x, e.y); }
   sh.lineTo(JP(CR, 0).x, FAR);
@@ -108,37 +106,26 @@ export function initJourney(canvas, onSpeed) {
   // road B
   const zB1 = JP(0, 121.7).y, zB2 = JP(0, 143.3).y, xB0 = JP(290, 0).x;
   dashed(line(V(xB0, zB1), V(XJ + 300, zB1)));
-  dashed(line(V(xB0, zB2), V(XJ + 300, zB2)));
+  dashed(line(V(JP(CL + 2 * (CR - CL) / 3 + 33, 0).x, zB2), V(XJ + 300, zB2)));   // from the gore
   // road C
   const xC1 = JP(CL + (CR - CL) / 3, 0).x, xC2 = JP(CL + 2 * (CR - CL) / 3, 0).x;
   dashed(line(V(xC1, CZ0), V(xC1, FAR)));
   dashed(line(V(xC2, CZ0), V(xC2, FAR)));
-  // through the junction (like the reference) the lane lines follow the curves: road A's first line
-  // splits into B's first line (S-bend) and C's first line (bend down); its second line runs on
-  // along the S-bend to B's second line and, where it splits, opens into the gore whose left side
-  // carries on as C's second line
-  const sBend = (pyA, pyB) => new THREE.CubicBezierCurve(JP(150, pyA), JP(220, pyA), JP(230, pyB), JP(290, pyB));
-  const part = (c, u0, u1) => ({
-    getLength: () => c.getLength() * (u1 - u0),
-    getPointAt: (u) => c.getPointAt(u0 + u * (u1 - u0)),
-    getTangentAt: (u) => c.getTangentAt(u0 + u * (u1 - u0)),
-  });
+  // through the junction (as the reference) no lane line crosses another: road A's first line runs
+  // parallel to the outer kerb's S-bend into B's first line, its second line parallel to the inner
+  // kerb's bend into C's first line; B's second line and C's second line both start at the gore
   const solidCurve = (c, w = 0.22, n = 24) => {
     for (let i = 0; i < n; i++) solid(c.getPointAt(i / n), c.getPointAt((i + 1) / n), w);
   };
   const xC1px = CL + (CR - CL) / 3, xC2px = CL + 2 * (CR - CL) / 3;
-  dashed(sBend(59, 121.7));
-  dashed(new THREE.CubicBezierCurve(JP(150, 59), JP(206, 59), JP(xC1px, 112), JP(xC1px, 165)));
-  const s2 = sBend(81, 143.3), U_T = 0.62;            // gore nose: where the second line splits
-  dashed(part(s2, 0, U_T));
+  dashed(new THREE.CubicBezierCurve(JP(150, 59), JP(220, 59), JP(230, 121.7), JP(290, 121.7)));
+  dashed(new THREE.CubicBezierCurve(JP(150, 81.3), JP(196, 81.3), JP(xC1px, 120), JP(xC1px, 165)));
   // gore (as the reference): a curved triangle, all three sides bowed in, chevron hatch inside;
   // its top side runs on into B's second line, its left side into C's second line
-  const gT = s2.getPointAt(U_T);
-  const gR = JP(290, 143.3), gB = JP(xC2px, 165);
-  const tp = { x: (gT.x - XJ) / K + 150, y: gT.y / K + 70 };   // the nose in sketch px
-  const top = new THREE.CubicBezierCurve(gT, JP(tp.x + 16, tp.y + 6), JP(268, 143.3), gR);
-  const left = new THREE.CubicBezierCurve(gT, JP(tp.x + 5, tp.y + 8), JP(xC2px, 150), gB);
-  const hyp = new THREE.QuadraticBezierCurve(gB, JP(xC2px, 143.3).lerp(JP(270.5, 154.2), 0.4), gR);
+  const gT = JP(xC2px - 8, 140), gR = JP(xC2px + 33, 143.3), gB = JP(xC2px, 167);
+  const top = new THREE.CubicBezierCurve(gT, JP(xC2px + 4, 141.5), JP(xC2px + 20, 143.3), gR);
+  const left = new THREE.CubicBezierCurve(gT, JP(xC2px - 4, 148), JP(xC2px, 156), gB);
+  const hyp = new THREE.QuadraticBezierCurve(gB, JP(xC2px, 143.3).lerp(JP(xC2px + 16.5, 155), 0.45), gR);
   solidCurve(top, 0.2, 16); solidCurve(left, 0.2, 16); solidCurve(hyp, 0.2, 16);
   const poly = [];
   for (let i = 0; i <= 24; i++) poly.push(top.getPointAt(i / 24));
@@ -361,6 +348,11 @@ export function initJourney(canvas, onSpeed) {
     stack.forEach((s) => { s.visible = inPort; });
     white.visible = P > B_END;
     shadowCatcher.visible = P < A_END + 0.05 || P > B_END;
+    // once the camera is straight overhead (0.74) road A's deep slab goes flat: when the camera
+    // later moves down road C its side face would show as a black band under road A
+    const flat = P >= 0.74;
+    slab.scale.y = flat ? 0.001 : 1;
+    slab.position.y = flat ? -0.04 : -40;
 
     // ---------------- speed readout
     let kmh = 0;
