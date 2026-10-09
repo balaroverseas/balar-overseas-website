@@ -366,12 +366,20 @@ export function initJourney(canvas, onSpeed) {
     focus.addScaledVector(sunRight, u - focus.dot(sunRight)).addScaledVector(sunUp, v - focus.dot(sunUp));
     sun.position.copy(focus).add(SUN_OFFSET);
     sun.target.position.copy(focus);
+    // inspection only: a close-up camera relative to the truck (journey.debugCam = { pos, look })
+    if (api.debugCam) {
+      camera.up.set(0, 1, 0);
+      camera.position.copy(truck.localToWorld(tmp.fromArray(api.debugCam.pos)));
+      camera.lookAt(truck.localToWorld(tmp.fromArray(api.debugCam.look)));
+    }
   };
 
   // `inspect` jumps straight to a progress (no damping) for frame-by-frame checks
-  return {
+  const api = {
     setProgress(v) { target = v; },
     inspect(v) { target = v; snap = true; },
+    debugCam: null,
     camera, scene, truck, box, rig, renderer: stage.renderer,
   };
+  return api;
 }

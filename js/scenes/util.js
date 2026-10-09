@@ -36,7 +36,18 @@ export function upgradeTruck(truck) {
     const model = src.clone(true);
     model.position.x = -1.1;
     const wheels = [];
-    model.traverse((o) => { if (/^WHEEL_/.test(o.name)) wheels.push(o); });
+    model.traverse((o) => {
+      if (/^WHEEL_/.test(o.name)) wheels.push(o);
+      // the source's tyre rubber is near mirror-gloss (roughness 0.15): under the environment light
+      // it read as white — real rubber is matt and dark
+      if (o.isMesh && /tyre|tire|rubber/i.test(o.material.name)) {
+        o.material = o.material.clone();
+        o.material.roughness = 0.9;
+        o.material.metalness = 0;
+        o.material.envMapIntensity = 0.25;
+        if (!o.material.map) o.material.color.set('#1a1a1a');
+      }
+    });
     truck.children.slice().forEach((c) => { if (!c.userData.keep) truck.remove(c); });
     truck.add(model);
     const R = 0.52;
