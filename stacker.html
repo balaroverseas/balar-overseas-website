@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reach Stacker 3D | Balar Overseas</title>
+<link rel="icon" href="https://balaroverseas.com/wp-content/uploads/2026/02/balar-new-logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira:wdth,wght@112..125,500;112..125,600;112..125,700;112..125,800&family=Inter:wght@400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/stacker3d.css">
+<style>
+  /* preview page only: the section itself lives in css/stacker3d.css */
+  body{margin:0;font-family:Inter,system-ui,sans-serif;background:#e6ecf2;color:#0f1a2b}
+  h2,.rs3d-step{font-family:Saira,Inter,sans-serif}
+  .pv-intro,.pv-outro{min-height:70vh;display:grid;place-items:center;text-align:center;padding:0 24px}
+  .pv-intro h1{font-family:Saira,sans-serif;font-size:clamp(32px,5vw,72px);margin:0;text-transform:uppercase}
+  .pv-intro p,.pv-outro p{opacity:.7}
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+<script>gsap.registerPlugin(ScrollTrigger);</script>
+<script type="module" src="js/pages/stacker3d.js"></script>
+</head>
+<body>
+<section class="pv-intro"><div><h1>Reach stacker</h1><p>Scroll down — the boom raises and lifts the container.</p></div></section>
+
+<section class="rs3d" data-rs3d aria-label="3D reach stacker lifting a container">
+  <div class="rs3d-sticky">
+    <canvas class="rs3d-canvas" aria-hidden="true"></canvas>
+    <div class="rs3d-head">
+      <h2>Built for heavy lifting</h2>
+      <p>From the yard to the vessel, every box is handled with the right machine and a trained operator.</p>
+      <p class="rs3d-fallback">3D view needs WebGL, which this browser has turned off.</p>
+    </div>
+    <div class="rs3d-ui">
+      <div><div class="rs3d-count">01 / 08</div><div class="rs3d-step">Resting position</div></div>
+      <div class="rs3d-bar"><i></i></div>
+    </div>
+  </div>
+</section>
+
+<section class="pv-outro"><p>End of the preview.</p></section>
+</body>
+</html>
