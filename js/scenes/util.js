@@ -50,11 +50,109 @@ export function upgradeTruck(truck) {
     });
     truck.children.slice().forEach((c) => { if (!c.userData.keep) truck.remove(c); });
     truck.add(model);
+    addWheelFaces(model, wheels);
     const R = 0.52;
-    truck.userData.spin = (dist) => wheels.forEach((w) => { w.rotation.z -= dist / R; });
+    // at road speed a wheel turns ~110° between frames, which the eye reads as standing still or
+    // running backwards (wagon-wheel effect): cap the visible turn per frame so the rotation reads
+    const MAX_STEP = 0.21;   // rad per frame (well under the 36° stud spacing)
+    truck.userData.spin = (dist) => {
+      const a = Math.max(-MAX_STEP, Math.min(MAX_STEP, dist / R));
+      wheels.forEach((w) => { w.rotation.z -= a; });
+    };
     truck.userData.model = model;
     return truck;
   }).catch((e) => { console.warn('[3D] truck model not loaded, keeping the built one', e); return truck; });
+}
+
+// The source wheels are near-black symmetric discs, so a turning wheel looks still. Each tyre gets an
+// outer face like a real truck wheel (as UC's): light steel rim with hand-holes and nuts, plus sidewall
+// lettering that breaks the symmetry so the rotation reads at any speed.
+let wheelFaceTex = null;
+function wheelFaceTexture() {
+  if (wheelFaceTex) return wheelFaceTex;
+  const S = 512, c = document.createElement('canvas');
+  c.width = c.height = S;
+  const g = c.getContext('2d'), C = S / 2, R = S / 2 - 2;
+  const ring = (r, col) => { g.beginPath(); g.arc(C, C, r, 0, Math.PI * 2); g.fillStyle = col; g.fill(); };
+  ring(R, '#1b1c1e');                                  // sidewall
+  ring(R * 0.97, '#232427');
+  // sidewall lettering: two runs of different length on opposite arcs (asymmetric on purpose)
+  g.fillStyle = '#8d9096';
+  g.font = `700 ${Math.round(S * 0.05)}px Arial, sans-serif`;
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  const arcText = (txt, start, rad) => {
+    const step = (S * 0.043) / rad;
+    [...txt].forEach((ch, i) => {
+      const a = start + i * step;
+      g.save(); g.translate(C + Math.cos(a) * rad, C + Math.sin(a) * rad); g.rotate(a + Math.PI / 2);
+      g.fillText(ch, 0, 0); g.restore();
+    });
+  };
+  arcText('BALAR ROADLINE', -Math.PI * 0.95, R * 0.86);
+  arcText('315/80 R22.5', Math.PI * 0.15, R * 0.86);
+  ring(R * 0.74, '#111214');                           // rim lip shadow
+  ring(R * 0.70, '#c9cdd3');                           // steel rim
+  ring(R * 0.62, '#aeb3ba');
+  ring(R * 0.58, '#d6d9de');                           // disc
+  for (let i = 0; i < 8; i++) {                        // hand-holes
+    const a = i * Math.PI / 4 + Math.PI / 8;
+    g.beginPath(); g.ellipse(C + Math.cos(a) * R * 0.45, C + Math.sin(a) * R * 0.45, R * 0.085, R * 0.06, a, 0, Math.PI * 2);
+    g.fillStyle = '#16171a'; g.fill();
+  }
+  ring(R * 0.31, '#9ca1a8');                           // hub
+  for (let i = 0; i < 10; i++) {                       // wheel nuts
+    const a = i * Math.PI / 5;
+    g.beginPath(); g.arc(C + Math.cos(a) * R * 0.24, C + Math.sin(a) * R * 0.24, R * 0.032, 0, Math.PI * 2);
+    g.fillStyle = '#ecedef'; g.fill();
+  }
+  ring(R * 0.14, '#5d6168');                           // hub cap
+  g.fillStyle = '#c23b2f';                             // valve marker
+  g.beginPath(); g.arc(C + R * 0.66, C, R * 0.025, 0, Math.PI * 2); g.fill();
+  wheelFaceTex = new THREE.CanvasTexture(c);
+  wheelFaceTex.colorSpace = THREE.SRGBColorSpace;
+  wheelFaceTex.anisotropy = 4;
+  return wheelFaceTex;
+}
+
+function addWheelFaces(model, wheels) {
+  model.updateMatrixWorld(true);
+  const mat = new THREE.MeshStandardMaterial({
+    map: wheelFaceTexture(), transparent: true, alphaTest: 0.5, roughness: 0.55, metalness: 0.25,
+    polygonOffset: true, polygonOffsetFactor: -2,
+  });
+  const done = new Map(), v = new THREE.Vector3();
+  const toModel = model.matrixWorld.clone().invert();
+  const inModel = (w, z) => new THREE.Vector3(0, 0, z).applyMatrix4(w.matrixWorld).applyMatrix4(toModel);
+  wheels.forEach((w) => {
+    // node-local extent: radius in x/y, width along the axle (local z)
+    const inv = w.matrixWorld.clone().invert();
+    let r = 0, zMax = 0;
+    w.traverse((m) => {
+      if (!m.isMesh) return;
+      const p = m.geometry.attributes.position;
+      for (let i = 0; i < p.count; i += 5) {
+        v.fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld).applyMatrix4(inv);
+        r = Math.max(r, Math.hypot(v.x, v.y)); zMax = Math.max(zMax, Math.abs(v.z));
+      }
+    });
+    if (r < 0.45) return;                              // rims and hubs: only tyres get a face
+    // a node spanning the axle gets both ends; otherwise only the side away from the centre line
+    const sides = zMax > 0.8 ? [1, -1]
+      : [1, -1].filter((s) => Math.abs(inModel(w, s * zMax).z) > Math.abs(inModel(w, -s * zMax).z));
+    sides.forEach((s) => {
+      // twin tyres share a position: keep the outermost face
+      const o = inModel(w, s * zMax);
+      const key = `${o.x.toFixed(1)}|${Math.sign(o.z)}`;
+      const prev = done.get(key);
+      if (!prev || Math.abs(o.z) > prev.d) done.set(key, { d: Math.abs(o.z), w, s, r, zMax });
+    });
+  });
+  done.forEach(({ w, s, r, zMax }) => {
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(r * 0.985, 40), mat);
+    disc.position.z = s * (zMax + 0.004);
+    if (s < 0) disc.rotation.y = Math.PI;
+    w.add(disc);
+  });
 }
 
 export const isMobile = () => window.matchMedia('(max-width: 860px)').matches;

@@ -3,3 +3,4 @@ Thumbs.db
 *.log
 __pycache__/
 seq/_test/
+seq/_t*/

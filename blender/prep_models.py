@@ -105,19 +105,25 @@ for o in list(tractor):
     if '.002_Metalic' in o.name or o.name.endswith('ed_Metalic_0') or '.016_Metalic' in o.name:
         tractor.remove(o)
         bpy.data.objects.remove(o, do_unlink=True)
-# the two front wheels sit ~0.6 units apart along the truck in the file: put the .002 one level
-# with the .001 one (same axle)
+# the file has both front wheels steered 45° (axle at 135° instead of along X): turn each back
+# straight about its own tyre centre, then put both on one axle (same y, mirrored x)
 fl = [o for o in tractor if o.name.startswith('Object_3.001_')]
 fr = [o for o in tractor if o.name.startswith('Object_3.002_')]
 if fl and fr:
-    hub_l = [o for o in fl if 'Hubs' in o.name] or fl
-    hub_r = [o for o in fr if 'Hubs' in o.name] or fr
-    (a0, a1), (b0, b1) = bounds(hub_l), bounds(hub_r)
-    dy = (a0.y + a1.y) / 2 - (b0.y + b1.y) / 2
-    transform_all(fr, Matrix.Translation((0, dy, 0)))
-    print('FRONT WHEEL aligned by', round(dy, 3))
+    centres = []
+    for grp in (fl, fr):
+        tread = [o for o in grp if 'Tyre_tread' in o.name] or grp
+        t0, t1 = bounds(tread)
+        c = (t0 + t1) / 2
+        transform_all(grp, Matrix.Translation(c) @ Matrix.Rotation(math.radians(45), 4, 'Z') @ Matrix.Translation(-c))
+        centres.append(c)
+    axle_y = (centres[0].y + centres[1].y) / 2
+    half = (abs(centres[0].x) + abs(centres[1].x)) / 2
+    for grp, c in zip((fl, fr), centres):
+        transform_all(grp, Matrix.Translation((math.copysign(half, c.x) - c.x, axle_y - c.y, 0)))
+    print('FRONT WHEELS straightened, axle y', round(axle_y, 3))
 # model units → metres from the wheelbase (front hubs y≈-10.97, rear hubs y≈11.99; real 4x2 TGX: 3.60 m)
-S_T = 3.60 / (11.99 + 10.97)
+S_T = 3.60 / (11.99 - axle_y) if fl and fr else 3.60 / (11.99 + 10.97)
 mn, mx = bounds(tractor)
 # +X forward (the model's front is −Y), tyres on the ground
 transform_all(tractor, Matrix.Rotation(math.radians(90), 4, 'Z') @ Matrix.Scale(S_T, 4) @ Matrix.Translation((0, 0, -mn.z)))
@@ -140,6 +146,24 @@ transform_all(trailer, Matrix.Rotation(math.pi, 4, 'Z') @ Matrix.Translation((0,
 for m in bpy.data.materials:
     if m.name.startswith('paint_yellow'):
         paint(m, '#22252b', metal=0.5, rough=0.5)
+
+
+def is_wheel(o):
+    names = ' '.join(s.material.name for s in o.material_slots if s.material) + ' ' + o.name
+    return any(w in names.lower() for w in ('tyre', 'tire', 'rims', 'hubs'))
+
+
+def centre_on_axles(objs):
+    """the source files are not centred across the vehicle: use the wheels' mid-line as y = 0"""
+    w = [o for o in objs if is_wheel(o)] or objs
+    a, b = bounds(w)
+    dy = -(a.y + b.y) / 2
+    transform_all(objs, Matrix.Translation((0, dy, 0)))
+    return dy
+
+
+print('TRAILER centred across by', round(centre_on_axles(trailer), 3))
+print('TRACTOR centred across by', round(centre_on_axles(tractor), 3))
 # 663k → ~70k triangles
 for o in trailer:
     tris = sum(len(p.vertices) - 2 for p in o.data.polygons)

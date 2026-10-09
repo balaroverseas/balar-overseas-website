@@ -148,7 +148,7 @@ export function initJourney(canvas, onSpeed) {
     const s = buildRibbedContainer(i ? '#d4632a' : '#1f3c8f', '');
     s.position.set(x, 0, ZP);
     scene.add(s);
-    upgradeContainer(s, { tint: i ? '#e0773d' : '#4467c4' });     // real box, tinted
+    upgradeContainer(s, { tint: i ? '#e0773d' : '#4467c4', number: i ? 'BLRU 554210 2' : 'BLRU 381926 4', ink: '#f2f2f2' });     // real box, tinted
     return s;
   });
   const rig = buildReachStacker3D({ container: false });
@@ -168,7 +168,7 @@ export function initJourney(canvas, onSpeed) {
   const CARRY_D = RW / 2 + 3.4 + 0.4;
   const carryTip = new THREE.Vector2(CARRY_D, DECK_Y + 0.4 + H + SP_H);
   const downTip = new THREE.Vector2(CARRY_D, DECK_Y + H + SP_H);
-  const clearTip = new THREE.Vector2(CARRY_D - 0.4, DECK_Y + H + SP_H + 0.9);   // locks open, lift clear
+  const clearTip = new THREE.Vector2(CARRY_D - 0.4, DECK_Y + H + SP_H + 2.0);   // locks open, lifts well clear (reference 0.36–0.40)
   const restPose = { angle: 4 * Math.PI / 180, ext: 0 };
   const lerpPose = (p0, p1, u) => ({ angle: lerp(p0.angle, p1.angle, u), ext: lerp(p0.ext, p1.ext, u) });
   const tipPose = (a2, b2, u) => rig.solve(new THREE.Vector2(lerp(a2.x, b2.x, u), lerp(a2.y, b2.y, u)));
@@ -243,18 +243,18 @@ export function initJourney(canvas, onSpeed) {
     const XC = 3.0;                                       // box (and trailer) x once on the truck
     // after the drop it backs off, swings round to the left and drives out of the shot
     // (fully out of the frame by 0.415, before it is switched off at 0.42)
-    const drive = seg(P, 0, 0.13), turnU = seg(P, 0.19, 0.26), back = seg(P, 0.365, 0.385), away = seg(P, 0.375, 0.415);
+    const drive = seg(P, 0, 0.13), turnU = seg(P, 0.19, 0.26), back = seg(P, 0.385, 0.40), away = seg(P, 0.39, 0.418);
     const rigX = lerp(lerp(RIG_PICK_X - 14, RIG_PICK_X, drive), XC, turnU) - 40 * Math.pow(away, 1.3);
     const rigZ = lerp(ZP, -CARRY_D, turnU) - 3.5 * back - 2 * away;
     rig.root.position.set(rigX, 0, rigZ);
-    rig.root.rotation.y = -Math.PI / 2 * turnU - Math.PI / 2 * seg(P, 0.375, 0.405);
+    rig.root.rotation.y = -Math.PI / 2 * turnU - Math.PI / 2 * seg(P, 0.39, 0.412);
     let pose;
     if (P < 0.15) pose = lerpPose(restPose, rig.solve(pickTip), seg(P, 0.04, 0.14));
     else if (P < 0.19) pose = tipPose(pickTip, liftTip, seg(P, 0.15, 0.19));
     else if (P < 0.34) pose = tipPose(liftTip, carryTip, seg(P, 0.19, 0.27));
     else if (P < 0.355) pose = tipPose(carryTip, downTip, seg(P, 0.34, 0.35));
-    else if (P < 0.37) pose = tipPose(downTip, clearTip, seg(P, 0.355, 0.37));
-    else pose = lerpPose(rig.solve(clearTip), restPose, seg(P, 0.37, 0.4));    // boom folds back to travel
+    else if (P < 0.385) pose = tipPose(downTip, clearTip, seg(P, 0.355, 0.385));
+    else pose = lerpPose(rig.solve(clearTip), restPose, seg(P, 0.385, 0.405));  // boom folds back to travel
     pose.lock = P < 0.3 ? seg(P, 0.135, 0.15) : 1 - seg(P, 0.35, 0.355);
     const tipL = rig.apply(pose);
     // wheels roll with the machine
@@ -284,7 +284,8 @@ export function initJourney(canvas, onSpeed) {
       tmp.copy(boxOnTruck);
       truck.localToWorld(tmp);
       box.position.copy(tmp);
-      box.rotation.set(0, Math.PI / 2 - heading, 0);
+      // same way round as on the spreader (doors to the rear) — +π/2 here flipped the box at set-down
+      box.rotation.set(0, -Math.PI / 2 - heading, 0);
       box.scale.setScalar(grow);
     } else if (P >= 0.15) {
       tipWorld.set(tipL.x, tipL.y - SP_H - H, 0);
@@ -320,10 +321,13 @@ export function initJourney(canvas, onSpeed) {
       // towards the camera → settles on the loaded truck exactly as phase B picks it up
       const wide = frame(lerp(RIG_PICK_X - 6, HERO_X - 9, drive), 0, 16);
       wide.y = 0.6 * wide.h;
-      const follow = frame(box.position.x - 1, 0, 11.5);
-      follow.y = 0.5 * follow.h;
+      // measured off the reference at 1280×720: from the turn to the set-down the ground sits at
+      // 90% of the height and the 40 ft box spans ~56% of the width, centred; 0.37 → 0.42 the view
+      // drops to the services framing (ground 75% at 0.40, 60% by 0.42)
+      const follow = frame(box.position.x - 0.15, 0, 10.6);
+      follow.y = 0.8 * follow.h;
       f = mixF(wide, follow, seg(P, 0.17, 0.28));
-      f = mixF(f, seqFrame(XC + 1.1), seg(P, 0.36, 0.42));
+      f = mixF(f, seqFrame(XC + 1.1), seg(P, 0.37, 0.42));
     } else {
       // starts exactly where the pre-rendered sequence ends, then settles into the services framing
       // pull back over the whole 0.42–0.47 stretch (like the reference) while the truck pulls

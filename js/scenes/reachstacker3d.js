@@ -136,12 +136,64 @@ export function buildRibbedContainer(color = '#b4372c', label = 'BALAR OVERSEAS'
   return mergeByMaterial(g);
 }
 
+// ISO 6346 markings painted on a real box: owner code + serial + check digit, size/type code,
+// the weight panel on the left door, CSC safety-approval and customs plates, small owner logo.
+function doorMarkings(number, iso, ink = '#1f2329') {
+  const W = 1024, H = Math.round(1024 * CONT.H / CONT.W);
+  const tex = canvasTex(W, H, (g) => {
+    g.clearRect(0, 0, W, H);
+    g.fillStyle = ink;
+    g.textBaseline = 'top';
+    // owner code + serial + boxed check digit, top right, with the size/type code under it
+    const [owner, serial, check] = number.split(' ');
+    g.font = '700 58px Arial, sans-serif';
+    const t1 = `${owner} ${serial}`;
+    const w1 = g.measureText(t1).width;
+    const x1 = W - 70 - w1 - 56;
+    g.fillText(t1, x1, 70);
+    g.lineWidth = 5; g.strokeStyle = ink; g.strokeRect(W - 70 - 46, 64, 46, 64);
+    g.fillText(check, W - 70 - 38, 70);
+    g.font = '700 50px Arial, sans-serif';
+    g.fillText(iso, W - 70 - g.measureText(iso).width, 146);
+    // weight panel, left door
+    g.font = '600 25px Arial, sans-serif';
+    const rows = [['MAX. GROSS', '30,480 KG', '67,200 LB'], ['TARE', '3,750 KG', '8,270 LB'], ['NET', '26,730 KG', '58,930 LB'], ['CU. CAP.', '67.7 CU.M', '2,390 CU.FT']];
+    rows.forEach(([k, a, b], i) => {
+      const y = 330 + i * 40;
+      g.fillText(k, 70, y); g.fillText(a, 250, y); g.fillText(b, 390, y);
+    });
+    // CSC safety approval plate (stamped metal) + customs plate, left door, lower
+    const plate = (x, y, w, h, lines) => {
+      const gr = g.createLinearGradient(x, y, x + w, y + h);
+      gr.addColorStop(0, '#d9dde2'); gr.addColorStop(1, '#a8aeb6');
+      g.fillStyle = gr; g.fillRect(x, y, w, h);
+      g.strokeStyle = '#6d737b'; g.lineWidth = 3; g.strokeRect(x, y, w, h);
+      g.fillStyle = '#3b4047'; g.font = '700 16px Arial, sans-serif';
+      lines.forEach((l, i) => g.fillText(l, x + 10, y + 10 + i * 19));
+      [[x + 6, y + 6], [x + w - 10, y + 6], [x + 6, y + h - 10], [x + w - 10, y + h - 10]].forEach(([px, py]) => { g.fillStyle = '#5c6168'; g.fillRect(px, py, 4, 4); });
+      g.fillStyle = ink;
+    };
+    plate(70, 560, 300, 150, ['CSC SAFETY APPROVAL', 'GBR/L/2026/0417', 'DATE MANUFACTURED 03/2026', 'MAX GROSS 30,480 KG', 'ALLOW. STACK 192,000 KG', 'RACKING TEST LOAD 15,240 KG']);
+    plate(70, 730, 300, 70, ['APPROVED FOR TRANSPORT', 'UNDER CUSTOMS SEAL']);
+    // owner logo, right door
+    g.font = '800 46px Arial, sans-serif';
+    g.fillText('BALAR', W - 70 - g.measureText('BALAR').width, 330);
+    g.font = '600 22px Arial, sans-serif';
+    g.fillText('OVERSEAS', W - 70 - g.measureText('OVERSEAS').width, 382);
+    // small hazard/handling stickers at eye level on the right door
+    g.fillStyle = '#f2b705'; g.fillRect(W - 170, 470, 100, 60);
+    g.fillStyle = ink; g.font = '800 16px Arial, sans-serif'; g.fillText('HANDLE', W - 160, 480); g.fillText('WITH CARE', W - 162, 502);
+  });
+  const m = new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.7, metalness: 0.1, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+  return new THREE.Mesh(new THREE.PlaneGeometry(CONT.W * 0.94, CONT.H * 0.94), m);
+}
+
 /**
  * Swaps a built container (buildRibbedContainer) for the real 40 ft model (assets/models/
  * container.glb, from "Container Pack" by drcrazzie, CC-BY 4.0) in the same frame: origin at the
  * bottom centre, long axis along Z, CONT dimensions. `tint` multiplies its (light grey) paint.
  */
-export function upgradeContainer(group, { tint = null, label = '', labelColor = '#1e2328' } = {}) {
+export function upgradeContainer(group, { tint = null, label = '', labelColor = '#1e2328', number = 'BLRU 210450 7', iso = '42G1', ink = '#1f2329' } = {}) {
   return loadGLB('assets/models/container.glb').then((src) => {
     const model = src.clone(true);
     // GLB: 12.065 × 2.924 (high-cube) × 2.426 m, long axis X → standard 40 ft, long axis Z
@@ -154,6 +206,19 @@ export function upgradeContainer(group, { tint = null, label = '', labelColor = 
     }
     group.children.slice().forEach((c) => group.remove(c));
     group.add(model);
+    // door end (+Z in this frame): ISO markings, plates, stickers
+    if (number) {
+      const d = doorMarkings(number, iso, ink);
+      d.position.set(0, CONT.H * 0.5, CONT.L / 2 + 0.012);
+      group.add(d);
+      // the number again at the top corner of both long sides, as painted on real boxes
+      [-1, 1].forEach((s) => {
+        const t = textPlane(`${number}  ${iso}`, 2.0, 0.22, { color: ink, px: 80, weight: 700 });
+        t.position.set(s * (CONT.W / 2 + 0.03), CONT.H - 0.32, s * (CONT.L / 2 - 1.3));
+        t.rotation.y = s * Math.PI / 2;
+        group.add(t);
+      });
+    }
     if (label) {
       [-1, 1].forEach((s) => {
         const t = textPlane(label, Math.min(6.4, CONT.L * 0.72), 0.75, { color: labelColor, px: 96 });
