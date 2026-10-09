@@ -156,10 +156,12 @@ def apply(f):
 if args.still:
     # the reference pins a single huge top-down jet over the testimonials: nose to the right,
     # fuselage ~95% of the width (nose cut by the right edge), wingtips cut by top and bottom
-    W = 76.0
+    # the reference uses a square image of the whole jet (nose right) that the page slides
+    # across the screen: frame the full length (~72 m) centred
+    W = 74.0
     jet.location = (0, 0, 0)
     jet.rotation_euler = (0, 0, -math.pi / 2)
-    cam.location = (-0.15 * W, 0, 220)
+    cam.location = (0.5, 0, 220)
     cam_data.lens = 36 * 220 / W
     os.makedirs(args.out, exist_ok=True)
     s.frame_set(1)

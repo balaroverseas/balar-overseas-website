@@ -193,13 +193,14 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 
 /* ---------- Testimonials + plane ---------- */
 .testi{position:relative;background:#fff;padding-bottom:120px}
-/* like the reference: one huge top-down jet (nose right) rides in with the white section,
-   overlapping the ship's clouds, then stays pinned mid-screen while the testimonials pass under it */
-.plane-stage{position:sticky;top:20vh;height:60vh;margin-bottom:-60vh;z-index:6;pointer-events:none}
-.plane-stage img{position:absolute;left:0;top:50%;width:100%;height:auto;transform:translateY(-50%);filter:drop-shadow(3vw 4.5vw 2.2vw rgba(0,0,0,.2))}
+/* like the reference: a sticky full-screen stage; a huge top-down jet (nose right) crosses it
+   left → right over the pinned white panel, growing slightly, its soft shadow drifting away */
+.plane-stage{position:sticky;top:0;height:100vh;height:100svh;margin-bottom:-100vh;margin-bottom:-100svh;z-index:6;pointer-events:none;overflow:hidden}
+.plane-stage img{position:absolute;left:0;top:0;width:100vw;height:auto;transform-origin:0 0;will-change:transform}
+.plane-stage .jet-shadow{filter:brightness(0) blur(10px);opacity:.22}
 
-.testi-head{padding-top:60vh;display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:end;margin-bottom:80px}
-.testi-head h2{font-size:clamp(36px,4.6vw,72px)}
+.testi-head{padding-top:13.5vh;padding-bottom:4vh;display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:end;background:#fff}
+.testi-head h2{font-size:clamp(30px,4.17vw,80px);line-height:1.05}
 .testi-head p{max-width:380px;justify-self:end}
 .t-row{display:grid;grid-template-columns:1fr 2fr;gap:40px;padding:60px 0;border-top:1px solid var(--line)}
 .t-who b{display:block;font-family:var(--display);font-stretch:125%;font-weight:700;text-transform:uppercase;margin-top:18px}

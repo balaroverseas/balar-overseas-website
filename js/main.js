@@ -162,16 +162,41 @@ function setupShip(ship) {
       // Blender frames are spread linearly over the section (frame = 1 + 199·S/0.97)
       ship && ship.setProgress(Math.min(1, S / 0.97));
       veil.style.opacity = 0.6 * range(S, 0.9, 1);   // the reference ends in a pale haze
-      const range = sec.offsetHeight - innerHeight;
+      const span = sec.offsetHeight - innerHeight;
       const titleMid = 0.5 * innerHeight - 0.5 * title.offsetHeight;   // title centred at S = 0.7
-      const y = titleMid - (S - 0.7) * range * 0.88;
+      const y = titleMid - (S - 0.7) * span * 0.88;
       flow.style.transform = `translate3d(0,${Math.min(y, innerHeight + 10)}px,0)`;
       sec.dataset.dynTheme = 'dark';
     },
   });
 }
 
-// ---------------------------------------------------------------- jet is a sticky still (CSS) — see .plane-stage
+// ---------------------------------------------------------------- jet over the testimonials
+// Measured off the reference (1280×720, d = px scrolled past the section top): the white panel
+// pins for 800px; the jet image (square, ~1.03× the screen width) crosses from x −1340 to +1444
+// between d 200 and 1400 (eased, see Q), growing 1289 → 1660px and rising −282 → −466px; its
+// shadow (0.857× size) slides from (+8, +50) to (+466, +432) relative to the jet.
+function setupPlane() {
+  const sec = $('#testimonials'), jet = $('.plane-stage .jet'), sh = $('.plane-stage .jet-shadow');
+  if (!sec || !jet) return;
+  const Q = [[0, 0], [0.167, 0.23], [0.333, 0.54], [0.5, 0.75], [0.667, 0.89], [0.833, 0.96], [1, 1]];
+  const ease = (t) => {
+    for (let i = 1; i < Q.length; i++) if (t <= Q[i][0]) return Q[i - 1][1] + (Q[i][1] - Q[i - 1][1]) * ((t - Q[i - 1][0]) / (Q[i][0] - Q[i - 1][0]));
+    return 1;
+  };
+  const place = () => {
+    const k = innerWidth / 1280;
+    const d = (scrollY - (sec.getBoundingClientRect().top + scrollY)) * (720 / innerHeight);
+    const q = ease(range(d, 200, 1400));
+    const w = (1289 + 371 * q) * k, x = (-1340 + 2784 * q) * k, y = (-282 - 184 * q) * k;
+    jet.style.transform = `translate3d(${x}px,${y}px,0) scale(${w / innerWidth})`;
+    const sw = w * 0.857, sx = x + (8 + 458 * q) * k, sy = y + (50 + 382 * q) * k;
+    sh.style.transform = `translate3d(${sx}px,${sy}px,0) scale(${sw / innerWidth})`;
+  };
+  ScrollTrigger.create({ trigger: sec, start: 'top bottom', end: 'bottom top', onUpdate: place, onRefresh: place });
+  // the white panel (heading) holds still for 800px of scrolling while the jet passes
+  ScrollTrigger.create({ trigger: '.testi-head', start: 'top top', end: () => '+=' + 800 * (innerHeight / 720), pin: true, invalidateOnRefresh: true });
+}
 // ---------------------------------------------------------------- boot
 async function boot() {
   await Promise.race([document.fonts.ready, wait(2500)]);
@@ -186,6 +211,7 @@ async function boot() {
   setupHero(globe);
   setupJourney(journey);
   setupShip(ship);
+  setupPlane();
   // fetch the ship and jet frames a few screens before they are needed
   ScrollTrigger.create({ trigger: '#why', start: 'top 400%', once: true, onEnter: () => ship.load() });
   setupCurves();
