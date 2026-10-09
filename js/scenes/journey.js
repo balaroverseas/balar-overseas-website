@@ -1,158 +1,18 @@
 // One continuous scroll-driven scene:
-//  A) reach stacker lifts a container, camera zooms in, container is lowered onto a truck
+//  A) the live reach stacker (reachstacker3d.js) drives to a stack, picks the top box, backs off
+//     turning to face the camera, the truck reverses in under it and the box is set down
+//     (reference timings: pick 0.15, lifted 0.19, turned 0.26, truck 0.30–0.34, down 0.35)
 //  B) truck drives (side view) while the services panel slides over
 //  C) camera orbits to a top-down view and the truck turns onto a crossing road
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { createStage, makeContainer, buildTruck, buildWheel, canvasTex, seg, lerp, clamp01 } from './util.js';
+import { createStage, buildTruck, seg, lerp, clamp01 } from './util.js';
+import { buildReachStacker3D, buildRibbedContainer, CONT } from './reachstacker3d.js';
 
 // phase boundaries measured off the reference: port/stacker → services panel → road
 const A_END = 0.42, B_END = 0.71;
 const range = (p, a, b) => clamp01((p - a) / (b - a));
 const ease = (t) => t * t * (3 - 2 * t);
-
-const hazardTex = () => canvasTex(128, 32, (g) => {
-  g.fillStyle = '#f2c230'; g.fillRect(0, 0, 128, 32);
-  g.fillStyle = '#151515';
-  for (let x = -32; x < 160; x += 22) { g.beginPath(); g.moveTo(x, 32); g.lineTo(x + 11, 32); g.lineTo(x + 27, 0); g.lineTo(x + 16, 0); g.fill(); }
-});
-
-function buildReachStacker() {
-  const g = new THREE.Group();
-  const paint = new THREE.MeshPhysicalMaterial({ color: '#1f72b8', metalness: 0.3, roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.12 });
-  const boomPaint = new THREE.MeshPhysicalMaterial({ color: '#262c34', metalness: 0.35, roughness: 0.4, clearcoat: 0.5, clearcoatRoughness: 0.25 });
-  const dark = new THREE.MeshStandardMaterial({ color: '#1b1d20', roughness: 0.7 });
-  const glass = new THREE.MeshPhysicalMaterial({ color: '#203040', metalness: 0.1, roughness: 0.05, transparent: true, opacity: 0.55, clearcoat: 1 });
-  const chrome = new THREE.MeshStandardMaterial({ color: '#e6e6e6', metalness: 1, roughness: 0.12 });
-  const hazard = new THREE.MeshStandardMaterial({ map: hazardTex(), roughness: 0.5 });
-  const add = (geo, m, x, y, z, parent = g) => {
-    const mesh = new THREE.Mesh(geo, m);
-    mesh.position.set(x, y, z); mesh.castShadow = mesh.receiveShadow = true; parent.add(mesh); return mesh;
-  };
-  const rbox = (w, h, d, r) => new RoundedBoxGeometry(w, h, d, 3, r);
-
-  // side-profile extrusion helper (profile drawn in X/Y, extruded across Z and centred)
-  const profile = (pts, depth, bevel, mat, z = 0, arcs = []) => {
-    const s = new THREE.Shape();
-    s.moveTo(pts[0][0], pts[0][1]);
-    pts.slice(1).forEach((p) => {
-      if (p.arc) s.absarc(p.arc[0], p.arc[1], p.arc[2], Math.PI, 0, true);
-      else s.lineTo(p[0], p[1]);
-    });
-    s.closePath();
-    const geo = new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: true, bevelSize: bevel, bevelThickness: bevel, bevelSegments: 4, curveSegments: 24 });
-    geo.translate(0, 0, -depth / 2 + z);
-    return add(geo, mat, 0, 0, 0);
-  };
-  const frameDark = new THREE.MeshPhysicalMaterial({ color: '#24272c', metalness: 0.4, roughness: 0.45, clearcoat: 0.4 });
-  const yellow = new THREE.MeshPhysicalMaterial({ color: '#f2c230', roughness: 0.35, clearcoat: 0.8 });
-
-  // lower chassis frame (dark) with wheel arches
-  profile([[-5.0, 0.75], { arc: [-2.6, 0.95, 1.2] }, [1.45, 0.95], { arc: [2.75, 1.1, 1.32] }, [4.6, 1.1], [4.6, 1.75], [-5.0, 1.75]], 2.7, 0.08, frameDark);
-  // main body shell: sloped engine hood at the rear, low deck in front of the cab
-  profile([[-5.0, 1.6], [4.35, 1.6], [4.55, 2.05], [4.1, 2.45], [0.2, 2.45], [-0.6, 2.55], [-1.05, 3.95], [-1.4, 4.2], [-3.9, 4.25], [-4.7, 3.85], [-5.0, 3.2]], 2.6, 0.14, paint);
-  // counterweight with hazard band
-  profile([[-5.75, 0.95], [-4.9, 0.95], [-4.9, 3.15], [-5.35, 3.25], [-5.75, 2.75]], 2.9, 0.1, frameDark);
-  add(new THREE.BoxGeometry(0.95, 0.28, 3.12), hazard, -5.32, 1.35, 0);
-  // engine grille + exhaust + logo on the hood
-  for (let i = 0; i < 5; i++) add(new THREE.BoxGeometry(1.8, 0.07, 0.03), dark, -3.1, 2.15 + i * 0.2, 1.46);
-  add(new THREE.CylinderGeometry(0.11, 0.13, 1.1, 12), chrome, -2.0, 4.75, -0.9);
-  const hoodLogo = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 0.42), new THREE.MeshBasicMaterial({ transparent: true, map: canvasTex(512, 112, (c, W, H) => {
-    c.clearRect(0, 0, W, H); c.fillStyle = '#ffffff'; c.font = '800 70px Saira, Arial, sans-serif'; c.textBaseline = 'middle'; c.fillText('BALAR', 8, H / 2 + 4);
-  }) }));
-  hoodLogo.position.set(-2.75, 3.55, 1.45);
-  g.add(hoodLogo);
-  // tail + head lights
-  add(new THREE.BoxGeometry(0.06, 0.25, 0.45), new THREE.MeshStandardMaterial({ color: '#ff3020', emissive: '#ff2010', emissiveIntensity: 1.2 }), -5.78, 2.4, 1.05);
-  add(new THREE.BoxGeometry(0.06, 0.22, 0.4), new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#fff6dc', emissiveIntensity: 1.5 }), 4.62, 1.85, 1.0);
-  // yellow handrails along the deck
-  [0.3, 1.15].forEach((x) => add(new THREE.CylinderGeometry(0.04, 0.04, 0.8, 8), yellow, x, 2.85, 1.25));
-  add(new THREE.CylinderGeometry(0.04, 0.04, 1.0, 8).rotateZ(Math.PI / 2), yellow, 0.72, 3.25, 1.25);
-
-  // cab: slanted glass greenhouse on a dark frame
-  const cabMat = paint;
-  profile([[-0.15, 2.45], [2.45, 2.45], [2.65, 2.7], [2.65, 2.95], [-0.15, 2.95]], 1.85, 0.06, cabMat, 0.5);
-  profile([[-0.05, 2.95], [2.55, 2.95], [2.85, 4.9], [2.6, 5.2], [0.05, 5.2], [-0.15, 4.95]], 1.75, 0.05, glass, 0.5);
-  profile([[-0.25, 5.15], [2.75, 5.15], [2.95, 5.4], [-0.15, 5.45]], 2.0, 0.08, paint, 0.5);
-  [[-0.05, 1.35], [2.6, 1.35], [-0.05, -0.35], [2.6, -0.35]].forEach(([x, z]) => {
-    const pillar = add(new THREE.BoxGeometry(0.11, 2.3, 0.11), dark, x + (x > 1 ? 0.15 : 0), 4.07, z);
-    if (x > 1) pillar.rotation.z = 0.15;
-  });
-  add(new THREE.BoxGeometry(0.75, 0.85, 0.75), new THREE.MeshStandardMaterial({ color: '#2b2b2b', roughness: 0.9 }), 0.8, 3.4, 0.5);   // seat
-  add(new THREE.CylinderGeometry(0.28, 0.28, 0.06, 20).rotateZ(1.2), dark, 1.9, 3.7, 0.5);                                          // steering wheel
-  const beacon = add(new THREE.CylinderGeometry(0.14, 0.16, 0.32, 16), new THREE.MeshStandardMaterial({ color: '#ffb020', emissive: '#ff8a00', emissiveIntensity: 1.4 }), 1.0, 5.6, 0.5);
-  [0.2, 2.4].forEach((x) => add(new THREE.BoxGeometry(0.3, 0.18, 0.22), new THREE.MeshStandardMaterial({ color: '#fff', emissive: '#fff6dc', emissiveIntensity: 1.2 }), x, 5.55, 1.3)); // work lights
-  add(new THREE.BoxGeometry(0.05, 0.5, 0.32), dark, 2.95, 4.3, 1.55);                                                                // mirror
-  [0.95, 1.4].forEach((y, i) => add(new THREE.BoxGeometry(0.6, 0.06, 0.35), chrome, -0.35 + i * 0.12, y, 1.55));                    // steps
-
-  // twin front wheels, single rear wheels (yellow port-equipment rims)
-  const wheels = [];
-  [[2.75, 1.1, 0.85, [1.0, 1.95]], [-2.6, 0.95, 0.75, [1.15]]].forEach(([x, r, wdt, zs]) => zs.forEach((z) => [1, -1].forEach((s) => {
-    const w = buildWheel(r, wdt, '#f2c230');
-    w.position.set(x, r, z * s);
-    g.add(w); wheels.push(w);
-  })));
-
-  // boom with decal, telescopic inner, twin lift cylinders
-  const pivot = new THREE.Vector3(-2.6, 4.25, 0);
-  const boom = new THREE.Group();
-  boom.position.copy(pivot);
-  g.add(boom);
-  add(rbox(8.2, 1.05, 1.0, 0.08).translate(4.1, 0, 0), boomPaint, 0, 0, 0, boom);
-  const label = canvasTex(1024, 96, (c, W, H) => {
-    c.clearRect(0, 0, W, H);
-    c.fillStyle = '#ffffff';
-    c.font = '800 64px Saira, Arial, sans-serif';
-    c.textBaseline = 'middle';
-    c.fillText('BALAR OVERSEAS', 40, H / 2 + 4);
-    c.fillStyle = '#3a8fca'; c.fillRect(620, 34, 360, 28);
-  });
-  const decal = new THREE.Mesh(new THREE.PlaneGeometry(5.6, 0.52), new THREE.MeshBasicMaterial({ map: label, transparent: true }));
-  decal.position.set(4.4, 0.02, 0.505);
-  boom.add(decal);
-  add(new THREE.CylinderGeometry(0.42, 0.42, 1.2, 20).rotateX(Math.PI / 2), chrome, 0, 0, 0, boom);    // pivot pin
-  const inner = add(rbox(10.5, 0.78, 0.78, 0.06).translate(5.25, 0, 0), boomPaint, 0, 0, 0, boom);
-
-  const rams = [-0.62, -1.15].map((z) => {
-    const barrel = add(new THREE.CylinderGeometry(0.27, 0.27, 2.6, 16).translate(0, 1.3, 0), paint, 0, 0, z);
-    const rod = add(new THREE.CylinderGeometry(0.14, 0.14, 1, 12).translate(0, 0.5, 0), chrome, 0, 0, z);
-    return { barrel, rod };
-  });
-  const base = new THREE.Vector3(-0.55, 2.35, 0);
-  const tmpA = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), q = new THREE.Quaternion();
-  const updateRams = () => {
-    const a = boom.rotation.z;
-    const top = new THREE.Vector3(3.9 * Math.cos(a), 3.9 * Math.sin(a), 0).add(pivot);
-    tmpA.copy(top).sub(base);
-    const len = tmpA.length();
-    q.setFromUnitVectors(up, tmpA.clone().normalize());
-    rams.forEach(({ barrel, rod }) => {
-      barrel.position.set(base.x, base.y, barrel.position.z);
-      barrel.quaternion.copy(q);
-      rod.position.set(base.x, base.y, rod.position.z).addScaledVector(tmpA.clone().normalize(), 2.2);
-      rod.quaternion.copy(q);
-      rod.scale.y = Math.max(0.1, len - 2.2);
-    });
-  };
-  return { group: g, boom, inner, pivot, updateRams, beacon };
-}
-
-function buildSpreader() {
-  const s = new THREE.Group();
-  const hazard = new THREE.MeshStandardMaterial({ map: hazardTex(), roughness: 0.5 });
-  const dark = new THREE.MeshPhysicalMaterial({ color: '#23262b', metalness: 0.4, roughness: 0.45, clearcoat: 0.4 });
-  const steel = new THREE.MeshStandardMaterial({ color: '#9aa0a6', metalness: 0.9, roughness: 0.3 });
-  const add = (geo, m, x, y, z) => { const b = new THREE.Mesh(geo, m); b.position.set(x, y, z); b.castShadow = true; s.add(b); return b; };
-  add(new RoundedBoxGeometry(12.0, 0.5, 0.9, 2, 0.08), dark, 0, 0.3, 0);   // main beam (local X)
-  [6.0, -6.0].forEach((x) => {
-    add(new THREE.BoxGeometry(0.6, 0.6, 2.6), hazard, x, 0.3, 0);          // end beams
-    [1.15, -1.15].forEach((z) => add(new THREE.BoxGeometry(0.4, 0.3, 0.3), steel, x, 0.0, z)); // twistlock castings
-  });
-  [2.2, -2.2].forEach((x) => add(new THREE.BoxGeometry(0.25, 0.25, 2.3), dark, x, 0.3, 0)); // cross members
-  add(new THREE.CylinderGeometry(0.75, 0.85, 0.5, 24), steel, 0, 0.8, 0);   // rotator
-  add(new RoundedBoxGeometry(1.7, 0.9, 1.4, 2, 0.12), dark, 0, 1.4, 0);     // headblock
-  return s;
-}
 
 export function initJourney(canvas, onSpeed) {
   const stage = createStage(canvas, { fov: 14, shadows: true, env: true, far: 3000 });
@@ -171,7 +31,9 @@ export function initJourney(canvas, onSpeed) {
 
   // ---------- Ground: white plane, black road slab (side view shows its face as a band)
   const white = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false }));
-  white.rotation.x = -Math.PI / 2; white.position.y = -0.03;
+  // under the road slab (80 m deep), not at ground level: at ground level it switched on at the
+  // start of the orbit right in front of the slab's black face — the ground band flashed white
+  white.rotation.x = -Math.PI / 2; white.position.y = -80.5;
   scene.add(white);
   const shadowCatcher = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.ShadowMaterial({ opacity: 0.12 }));
   shadowCatcher.rotation.x = -Math.PI / 2; shadowCatcher.position.y = -0.02; shadowCatcher.receiveShadow = true;
@@ -270,17 +132,36 @@ export function initJourney(canvas, onSpeed) {
     inst.setMatrixAt(i, m4);
   });
   scene.add(inst);
-  // ---------- Port: stack + reach stacker (behind the truck lane at z = -6)
-  const ZS = -6;
-  const stackA = makeContainer('#1f3a8a', {}); stackA.rotation.y = Math.PI / 2; stackA.position.set(9.6, 1.3, ZS); scene.add(stackA);
-  const stackB = makeContainer('#d4632a', {}); stackB.rotation.y = Math.PI / 2; stackB.position.set(12.05, 1.3, ZS); scene.add(stackB);
-  const rs = buildReachStacker();
-  rs.group.position.set(-4.5, 0, ZS);
-  scene.add(rs.group);
-  const spreader = buildSpreader();
-  scene.add(spreader);
-  const box = makeContainer('#c4c9cf', { label: 'BALAR OVERSEAS', labelColor: '#1e2328' });
+  // ---------- Port: two boxes end-on with the hero box on top, behind the truck lane (z = ZP);
+  // the live reach stacker picks it, backs off turning to face the camera and sets it on the truck
+  const ZP = -9;
+  const STACK_X = [20.6, 23.04], HERO_X = (STACK_X[0] + STACK_X[1]) / 2;
+  const stack = STACK_X.map((x, i) => {
+    const s = buildRibbedContainer(i ? '#d4632a' : '#1f3c8f', '');
+    s.position.set(x, 0, ZP);
+    scene.add(s);
+    return s;
+  });
+  const rig = buildReachStacker3D({ container: false });
+  scene.add(rig.root);
+  const box = buildRibbedContainer('#c4c9cf', 'BALAR OVERSEAS', '#1e2328');
   scene.add(box);
+  const SP_H = rig.SP_H, H = CONT.H;
+  // where the stacker stands (rig x) for the pick, and its pose then
+  const PICK_REACH = 9.4;                                   // tip ahead of the rig origin
+  const RIG_PICK_X = HERO_X - PICK_REACH;
+  const pickTip = new THREE.Vector2(PICK_REACH, 2 * H + SP_H);
+  const liftTip = new THREE.Vector2(PICK_REACH - 0.4, 2 * H + SP_H + 1.6);
+  // after the turn the boom points at the camera (+Z) over the truck lane: box low over the deck
+  const DECK_Y = 1.6;                                       // truck deck (container bottom) height
+  const CARRY_D = 7.5;                                      // box ahead of the rig, = the rig's distance behind the lane
+  const carryTip = new THREE.Vector2(CARRY_D, DECK_Y + 0.4 + H + SP_H);
+  const downTip = new THREE.Vector2(CARRY_D, DECK_Y + H + SP_H);
+  const clearTip = new THREE.Vector2(CARRY_D - 0.4, DECK_Y + H + SP_H + 0.9);   // locks open, lift clear
+  const restPose = { angle: 4 * Math.PI / 180, ext: 0 };
+  const lerpPose = (p0, p1, u) => ({ angle: lerp(p0.angle, p1.angle, u), ext: lerp(p0.ext, p1.ext, u) });
+  const tipPose = (a2, b2, u) => rig.solve(new THREE.Vector2(lerp(a2.x, b2.x, u), lerp(a2.y, b2.y, u)));
+  const tipWorld = new THREE.Vector3();
 
   // same livery as the Blender truck the sequence hands over from
   const truck = buildTruck({ cab: '#1a1c21' });
@@ -329,26 +210,41 @@ export function initJourney(canvas, onSpeed) {
   };
   // reference pacing (fractions of phase C): straight until 0.43, turn 0.43–0.55, then road C
   const pathS = (c) => (c < 0.43 ? L1 * (c / 0.43) : c < 0.55 ? L1 + TURN * ((c - 0.43) / 0.12) : L1 + TURN + 110 * ((c - 0.55) / 0.45));
-  const tmp = new THREE.Vector3(), boxOnTruck = new THREE.Vector3(-1.1, 2.9, 0);
+  const tmp = new THREE.Vector3(), boxOnTruck = new THREE.Vector3(-1.1, 1.6, 0);   // box origin = bottom centre, on the deck
   let target = 0, P = 0, prevTruckX = null, prevTruckZ = null, lastSpeed = -1;
 
   stage.onFrame = (t, dt) => {
     P = THREE.MathUtils.damp(P, target, 7, dt);
     const a = range(P, 0, A_END), b = range(P, A_END, B_END), c = range(P, B_END, 1);
 
-    // ---------------- container + reach stacker (phase A)
-    const XC = 3.0;
-    const lift = seg(a, 0.08, 0.35), zoomIn = seg(a, 0.3, 0.5), turn = seg(a, 0.4, 0.55);
-    const lower = seg(a, 0.62, 0.82), release = seg(a, 0.82, 0.95), toTruck = seg(a, 0.85, 1);
-    const truckArrive = seg(a, 0.45, 0.66);
+    // ---------------- reach stacker + box (phase A), reference timings in P:
+    // drive in & spreader onto the box 0–0.15 · lift 0.15–0.19 · back off turning to face the
+    // camera 0.19–0.26 · truck reverses in 0.30–0.34 · box down 0.34–0.35 · locks open,
+    // spreader lifts clear 0.35–0.40 · stacker backs away 0.38–0.42 (it never vanishes)
+    const XC = 3.0;                                       // box (and trailer) x once on the truck
+    // after the drop it backs off, swings round to the left and drives out of the shot
+    const drive = seg(P, 0, 0.13), turnU = seg(P, 0.19, 0.26), back = seg(P, 0.365, 0.385), away = seg(P, 0.38, 0.47);
+    const rigX = lerp(lerp(RIG_PICK_X - 14, RIG_PICK_X, drive), XC, turnU) - 34 * Math.pow(away, 1.3);
+    const rigZ = lerp(ZP, -CARRY_D, turnU) - 3.5 * back - 2 * away;
+    rig.root.position.set(rigX, 0, rigZ);
+    rig.root.rotation.y = -Math.PI / 2 * turnU - Math.PI / 2 * seg(P, 0.38, 0.43);
+    let pose;
+    if (P < 0.15) pose = lerpPose(restPose, rig.solve(pickTip), seg(P, 0.04, 0.14));
+    else if (P < 0.19) pose = tipPose(pickTip, liftTip, seg(P, 0.15, 0.19));
+    else if (P < 0.34) pose = tipPose(liftTip, carryTip, seg(P, 0.19, 0.27));
+    else if (P < 0.355) pose = tipPose(carryTip, downTip, seg(P, 0.34, 0.35));
+    else if (P < 0.37) pose = tipPose(downTip, clearTip, seg(P, 0.355, 0.37));
+    else pose = lerpPose(rig.solve(clearTip), restPose, seg(P, 0.37, 0.4));    // boom folds back to travel
+    pose.lock = P < 0.3 ? seg(P, 0.135, 0.15) : 1 - seg(P, 0.35, 0.355);
+    const tipL = rig.apply(pose);
+    // wheels roll with the machine
+    const rigMove = Math.hypot(rigX - (rig.root.userData.px ?? rigX), rigZ - (rig.root.userData.pz ?? rigZ));
+    rig.root.userData.px = rigX; rig.root.userData.pz = rigZ;
+    rig.parts.wheels.forEach((w) => { w.rotation.z -= rigMove / 0.76; });
 
-    let cx = lerp(10.83, XC, lift), cy = lerp(3.9, 9.2, lift), cz = lerp(ZS, 0, zoomIn);
-    if (a >= 0.62) cy = lerp(9.2, 2.9, lower);
-    const boxRot = lerp(Math.PI / 2, 0, turn);
-
-    // truck x (A arrives, B drives) and path (C)
+    // truck x (A reverses in, B drives) and path (C)
     let tx, tz = 0, heading = 0;
-    if (P < A_END) tx = lerp(-60, XC + 1.1, truckArrive);
+    if (P < A_END) tx = lerp(XC + 1.1 + 60, XC + 1.1, 1 - Math.pow(1 - seg(P, 0.30, 0.34), 2));
     else if (P < B_END) tx = XC + 1.1 + 260 * Math.pow(b, 1.35);
     else {
       const pp = pathAt(pathS(c));
@@ -356,53 +252,39 @@ export function initJourney(canvas, onSpeed) {
     }
     truck.position.set(tx, 0, tz);
     truck.rotation.y = -heading;
-    // the reference's road truck is ~9% bigger against the road than at the hand-over from the
-    // Blender frames: grow it while the camera swings up (nothing to compare it with mid-orbit)
+    // the reference's road truck is ~9% bigger against the road than in the side view:
+    // grow it while the camera swings up (nothing to compare it with mid-orbit)
     const grow = 1 + 0.09 * ease(range(c, 0, 0.07));
     truck.scale.setScalar(grow);
     if (prevTruckX !== null) truck.userData.spin(Math.hypot(tx - prevTruckX, tz - prevTruckZ));
     prevTruckX = tx; prevTruckZ = tz;
 
-    if (a >= 0.82) {
+    // box: on the stack → on the spreader → on the truck (long axis along the trailer)
+    if (P >= 0.35) {
       tmp.copy(boxOnTruck);
       truck.localToWorld(tmp);
       box.position.copy(tmp);
-      box.rotation.set(0, -heading, 0);
+      box.rotation.set(0, Math.PI / 2 - heading, 0);
       box.scale.setScalar(grow);
+    } else if (P >= 0.15) {
+      tipWorld.set(tipL.x, tipL.y - SP_H - H, 0);
+      rig.root.localToWorld(tipWorld);
+      box.position.copy(tipWorld);
+      box.rotation.set(0, rig.root.rotation.y, 0);
+      box.scale.setScalar(1);
     } else {
-      box.position.set(cx, cy, cz);
-      box.rotation.set(0, boxRot, 0);
+      box.position.set(HERO_X, H, ZP);
+      box.rotation.set(0, 0, 0);
       box.scale.setScalar(1);
     }
 
-    // spreader rides on the box; after release the stacker lifts it back up and parks
-    // after the drop the stacker reverses out of the shot, taking its spreader along
-    const reverse = Math.pow(seg(a, 0.86, 1), 1.6) * 45 + (P > A_END ? 45 : 0);
-    rs.group.position.x = -4.5 - reverse;
-    if (a >= 0.82) {
-      const sx = lerp(XC, XC - 2.5, release) - reverse, sy = lerp(2.9 + 1.3, 10.2, release), sz = lerp(0, ZS, release);
-      spreader.position.set(sx, sy, sz);
-      spreader.rotation.y = 0;
-    } else {
-      spreader.position.set(box.position.x, box.position.y + 1.3, box.position.z);
-      spreader.rotation.y = boxRot;
-    }
-
-    // reach stacker stays in the port; it is simply left behind once the truck drives off
-    const inPort = P < A_END + 0.1;
-    rs.group.visible = spreader.visible = inPort;
-    stackA.visible = stackB.visible = P < A_END;   // the Blender sequence hides the stack after the orbit too
-    white.visible = shadowCatcher.visible = P > B_END;
-    if (inPort) {
-      const tip = new THREE.Vector3(spreader.position.x, spreader.position.y + 1.9, ZS);
-      const piv = rs.pivot.clone().add(rs.group.position);
-      const dx = tip.x - piv.x, dy = tip.y - piv.y;
-      rs.boom.rotation.z = Math.atan2(dy, dx);
-      const ext = THREE.MathUtils.clamp(Math.hypot(dx, dy) - 8, 0, 10.5);
-      rs.inner.position.x = ext - 2.5;
-      rs.updateRams();
-      rs.beacon.material.emissiveIntensity = 0.6 + 1.4 * (0.5 + 0.5 * Math.sin(t * 9));
-    }
+    // the port is left behind with the truck: at 0.42 the stack is just off the right edge and the
+    // stacker off the left, so they go then (the camera then follows the truck past where they stood)
+    const inPort = P < A_END;
+    rig.root.visible = inPort;
+    stack.forEach((s) => { s.visible = inPort; });
+    white.visible = P > B_END;
+    shadowCatcher.visible = P < A_END + 0.05 || P > B_END;
 
     // ---------------- speed readout
     let kmh = 0;
@@ -412,16 +294,16 @@ export function initJourney(canvas, onSpeed) {
     if (kmh !== lastSpeed) { lastSpeed = kmh; onSpeed && onSpeed(kmh); }
 
     // ---------------- camera
-    const wide = frame(2.6, 0, 13.4);
-    wide.y = 0.6 * wide.h - 0.2;
-    // moderate zoom: container stays the hero but the stacker never leaves the frame
-    const close = frame(cx - 2, cy - 1.8, 11.5);
-    const low = frame(cx - 1.5, 5.2, 12.5);
     let f;
     if (P < A_END) {
-      f = mixF(wide, close, zoomIn);
-      if (a > 0.6) f = mixF(f, low, seg(a, 0.6, 0.82));
-      if (a > 0.85) f = mixF(f, sideTruckFrame(tx), toTruck);
+      // wide over the stacker and the stack (ground ~80% down) → follows the box as it turns
+      // towards the camera → settles on the loaded truck exactly as phase B picks it up
+      const wide = frame(lerp(RIG_PICK_X - 6, HERO_X - 9, drive), 0, 16);
+      wide.y = 0.6 * wide.h;
+      const follow = frame(box.position.x - 1, 0, 11.5);
+      follow.y = 0.5 * follow.h;
+      f = mixF(wide, follow, seg(P, 0.17, 0.28));
+      f = mixF(f, seqFrame(XC + 1.1), seg(P, 0.36, 0.42));
     } else {
       // starts exactly where the pre-rendered sequence ends, then settles into the services framing
       f = mixF(seqFrame(tx), sideTruckFrame(tx), seg(b, 0.03, 0.1));
@@ -450,9 +332,11 @@ export function initJourney(canvas, onSpeed) {
       camera.lookAt(f.x, f.y, 0);
     }
 
-    sun.position.set(tx + 14, 40, tz + 24);
-    sun.target.position.set(tx, 0, tz);
+    // shadows follow the action: the stacker/box in the port, then the truck
+    const fx = P < A_END ? box.position.x : tx, fz = P < A_END ? box.position.z : tz;
+    sun.position.set(fx + 14, 40, fz + 24);
+    sun.target.position.set(fx, 0, fz);
   };
 
-  return { setProgress(v) { target = v; } };
+  return { setProgress(v) { target = v; }, camera, scene };
 }

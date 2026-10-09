@@ -81,9 +81,10 @@ function textPlane(text, w, h, { color = '#ffffff', weight = 800, px = 150 } = {
   return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.5, metalness: 0.1, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
 }
 
-// ------------------------------------------------------------------ 20 ft container with real ribs
-export const CONT = { L: 6.058, W: 2.438, H: 2.591 };
-export function buildRibbedContainer(color = '#b4372c', label = 'BALAR OVERSEAS') {
+// ------------------------------------------------------------------ 40 ft container with real ribs
+// (40 ft: same length as the skeletal trailer it is loaded onto)
+export const CONT = { L: 12.192, W: 2.438, H: 2.591 };
+export function buildRibbedContainer(color = '#b4372c', label = 'BALAR OVERSEAS', labelColor = '#ffffff') {
   const g = new THREE.Group();
   const add = adder(g);
   const paint = new THREE.MeshStandardMaterial({ color, metalness: 0.35, roughness: 0.55 });
@@ -105,8 +106,9 @@ export function buildRibbedContainer(color = '#b4372c', label = 'BALAR OVERSEAS'
   ribs.castShadow = ribs.receiveShadow = true;
   g.add(ribs);
   // roof stiffeners
-  const roofRibs = new THREE.InstancedMesh(B(W - 0.3, 0.03, 0.09), paint, 18);
-  for (let i = 0; i < 18; i++) { m4.makeTranslation(0, H - 0.07, -L / 2 + 0.35 + i * (L - 0.7) / 17); roofRibs.setMatrixAt(i, m4); }
+  const nRoof = Math.round(L * 3);
+  const roofRibs = new THREE.InstancedMesh(B(W - 0.3, 0.03, 0.09), paint, nRoof);
+  for (let i = 0; i < nRoof; i++) { m4.makeTranslation(0, H - 0.07, -L / 2 + 0.35 + i * (L - 0.7) / (nRoof - 1)); roofRibs.setMatrixAt(i, m4); }
   g.add(roofRibs);
   // frame: corner posts, top/bottom side rails, end rails
   [-1, 1].forEach((sx) => [-1, 1].forEach((sz) => add(B(0.16, H, 0.16), frame, sx * (W / 2 - 0.08), H / 2, sz * (L / 2 - 0.08))));
@@ -122,8 +124,8 @@ export function buildRibbedContainer(color = '#b4372c', label = 'BALAR OVERSEAS'
   });
   [-1, 1].forEach((sx) => [0.5, 1.3, 2.1].forEach((y) => add(B(0.06, 0.12, 0.05), casting, sx * (W / 2 - 0.02), y, L / 2 + 0.02)));
   if (label) {
-    const t = textPlane(label, 4.4, 0.6, { color: '#ffffff', px: 96 });
-    t.position.set(W / 2 + 0.035, H * 0.62, -0.2);
+    const t = textPlane(label, Math.min(6.4, L * 0.72), 0.75, { color: labelColor, px: 96 });
+    t.position.set(W / 2 + 0.035, H * 0.62, -L * 0.08);
     t.rotation.y = Math.PI / 2;
     g.add(t);
     const t2 = t.clone();
@@ -135,7 +137,8 @@ export function buildRibbedContainer(color = '#b4372c', label = 'BALAR OVERSEAS'
 }
 
 // ------------------------------------------------------------------ the machine
-export function buildReachStacker3D() {
+// opts.container: false when the scene owns the box (it has to stay on a truck after release)
+export function buildReachStacker3D({ container: withContainer = true } = {}) {
   const M = materials();
   const root = new THREE.Group();
   const parts = { root, cylinders: [], wheels: [] };
@@ -331,14 +334,15 @@ export function buildReachStacker3D() {
   as(B(0.32, 0.55, 0.32), M.grey, 0, -0.3, 0);                                                 // link
   as(RB(1.15, 0.42, 1.4, 0.08), M.blue, 0, -0.78, 0);                                          // rotator
   as(CY(0.5, 0.12, 'y', 28), M.steel, 0, -1.02, 0);                                             // slewing ring
-  as(B(0.62, 0.46, 4.6), M.grey, 0, -1.28, 0);                                                  // main beam
-  as(B(0.46, 0.34, 6.1), M.greyMid, 0, -1.28, 0);                                               // telescopic beams
+  const SP_END = CONT.L / 2 - 0.09, SP_SIDE = CONT.W / 2 - 0.09;
+  // main beam with the two telescopic arms run out to the box length (40 ft)
+  as(B(0.62, 0.46, 6.0), M.grey, 0, -1.28, 0);                                                  // main beam
+  as(B(0.46, 0.34, 2 * SP_END + 0.2), M.greyMid, 0, -1.28, 0);                                  // telescopic arms
   [-1, 1].forEach((s) => {
-    as(CY(0.07, 1.9, 'z', 12), M.chrome, s * 0.36, -1.2, s * 0.9);                              // spreader cylinders
-    as(CY(0.1, 1.2, 'z', 12), M.grey, s * 0.36, -1.2, s * 0.6);
+    as(CY(0.07, 3.2, 'z', 12), M.chrome, s * 0.36, -1.2, s * 2.6);                              // telescoping cylinders
+    as(CY(0.1, 2.0, 'z', 12), M.grey, s * 0.36, -1.2, s * 1.6);
   });
   const lights = [];
-  const SP_END = CONT.L / 2 - 0.09, SP_SIDE = CONT.W / 2 - 0.09;
   [-1, 1].forEach((sz) => {
     as(B(2.62, 0.38, 0.42), M.yellow, 0, -1.47, sz * SP_END);                                  // end beams
     as(B(2.5, 0.04, 0.3), M.black, 0, -1.27, sz * SP_END);
@@ -354,8 +358,8 @@ export function buildReachStacker3D() {
   const SP_H = 1.76;      // head pin → container roof when locked
 
   // ---- container
-  const container = buildRibbedContainer('#b4372c');
-  root.add(container);
+  const container = withContainer ? buildRibbedContainer('#b4372c') : null;
+  if (container) root.add(container);
   parts.container = container;
 
   // ---------------------------------------------------------------- kinematics
@@ -396,8 +400,10 @@ export function buildReachStacker3D() {
       l.material.color.setRGB(lerp(1, 0.2, lock), lerp(0.23, 0.95, lock), lerp(0.18, 0.35, lock));
       l.material.emissive.setRGB(lerp(1, 0.1, lock), lerp(0.13, 0.9, lock), lerp(0.06, 0.25, lock));
     });
-    if (attached) container.position.set(tip.x, tip.y - SP_H - CONT.H, 0);
-    else container.position.copy(contPos);
+    if (container) {
+      if (attached) container.position.set(tip.x, tip.y - SP_H - CONT.H, 0);
+      else container.position.copy(contPos);
+    }
     return tip;
   };
 
