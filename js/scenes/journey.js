@@ -323,7 +323,9 @@ export function initJourney(canvas, onSpeed) {
       f = mixF(f, seqFrame(XC + 1.1), seg(P, 0.36, 0.42));
     } else {
       // starts exactly where the pre-rendered sequence ends, then settles into the services framing
-      f = mixF(seqFrame(tx), sideTruckFrame(tx), seg(b, 0.03, 0.1));
+      // pull back over the whole 0.42–0.47 stretch (like the reference) while the truck pulls
+      // away — squeezed into 0.43–0.45 it lurched at ~16 km/h
+      f = mixF(seqFrame(tx), sideTruckFrame(tx), seg(P, 0.42, 0.47));
     }
 
     const orbit = P >= B_END ? ease(range(c, 0, 0.07)) * (Math.PI / 2) : 0;   // top view by ~0.73
