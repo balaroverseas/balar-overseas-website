@@ -172,19 +172,23 @@ function setupShip(ship) {
   const flow = $('#whyFlow'), title = $('#whyTitle'), veil = $('#shipVeil');
   // Like the reference: no text for the first ~65% (just the ship), then the title + 2-column
   // cards scroll up over it as one block at ~0.88× page speed (title centred at S≈0.7).
+  const apply = (S) => {
+    // Blender frames are spread linearly over the section (frame = 1 + 199·S/0.97)
+    ship && ship.setProgress(Math.min(1, S / 0.97));
+    veil.style.opacity = 0.6 * range(S, 0.9, 1);   // the reference ends in a pale haze
+    const span = sec.offsetHeight - innerHeight;
+    const titleMid = 0.5 * innerHeight - 0.5 * title.offsetHeight;   // title centred at S = 0.7
+    const y = titleMid - (S - 0.7) * span * 0.88;
+    flow.style.transform = `translate3d(0,${Math.min(y, innerHeight + 10)}px,0)`;
+    sec.dataset.dynTheme = 'dark';
+  };
+  // onUpdate never fires while the section is still scrolling in (progress stays 0), so set the
+  // start state up front too — otherwise the title shows over the ship as the section enters
+  apply(0);
   ScrollTrigger.create({
     trigger: sec, start: 'top top', end: 'bottom bottom',
-    onUpdate: (s) => {
-      const S = s.progress;
-      // Blender frames are spread linearly over the section (frame = 1 + 199·S/0.97)
-      ship && ship.setProgress(Math.min(1, S / 0.97));
-      veil.style.opacity = 0.6 * range(S, 0.9, 1);   // the reference ends in a pale haze
-      const span = sec.offsetHeight - innerHeight;
-      const titleMid = 0.5 * innerHeight - 0.5 * title.offsetHeight;   // title centred at S = 0.7
-      const y = titleMid - (S - 0.7) * span * 0.88;
-      flow.style.transform = `translate3d(0,${Math.min(y, innerHeight + 10)}px,0)`;
-      sec.dataset.dynTheme = 'dark';
-    },
+    onUpdate: (s) => apply(s.progress),
+    onRefresh: (s) => apply(s.progress),
   });
 }
 

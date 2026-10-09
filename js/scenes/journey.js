@@ -188,7 +188,8 @@ export function initJourney(canvas, onSpeed) {
   const XJ = XB + L1;              // road A starts to bend here
   const K = RW / 66;               // reference sketch (px at the zoomed-out frame) → metres
   const J = (px, py) => new THREE.Vector2(XJ + (px - 150) * K, (py - 70) * K);
-  const CX = J(229.5, 0).x, CZ0 = J(0, 165).y;      // road C centreline x, start z
+  const CX = J(229.5, 0).x, CZ0 = J(0, 165).y;      // truck's line down road C, road C start z
+  const CL = 197, CR = 278;                          // road C kerbs (sketch x)
   const FAR = 420;
   // flat near-black like the reference (unlit, so it never turns grey under the lights)
   const roadMat = new THREE.MeshBasicMaterial({ color: '#111111', toneMapped: false, side: THREE.DoubleSide });
@@ -205,9 +206,11 @@ export function initJourney(canvas, onSpeed) {
   { const c1 = JP(220, 37), c2 = JP(230, 100), e = JP(290, 100); sh.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, e.x, e.y); }
   sh.lineTo(XJ + 300, JP(0, 100).y);
   sh.lineTo(XJ + 300, JP(0, 165).y);
-  p = JP(272, 165); sh.lineTo(p.x, p.y);
-  { const c = JP(262, 165), e = JP(262, 175); sh.quadraticCurveTo(c.x, c.y, e.x, e.y); }
-  sh.lineTo(JP(262, 0).x, FAR);
+  // road C is wider than A/B in the reference (≈1× the truck's length across, the truck running
+  // left of its centre): its right kerb sits at 278, not 262 like a plain three-lane road
+  p = JP(CR + 10, 165); sh.lineTo(p.x, p.y);
+  { const c = JP(CR, 165), e = JP(CR, 175); sh.quadraticCurveTo(c.x, c.y, e.x, e.y); }
+  sh.lineTo(JP(CR, 0).x, FAR);
   sh.lineTo(JP(197, 0).x, FAR);
   p = JP(197, 165); sh.lineTo(p.x, p.y);
   { const c1 = JP(197, 130), c2 = JP(185, 103), e = JP(150, 103); sh.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, e.x, e.y); }
@@ -240,7 +243,7 @@ export function initJourney(canvas, onSpeed) {
   dashed(line(V(xB0, zB1), V(XJ + 300, zB1)));
   dashed(line(V(xB0, zB2), V(XJ + 300, zB2)));
   // road C
-  const xC1 = JP(218.7, 0).x, xC2 = JP(240.3, 0).x;
+  const xC1 = JP(CL + (CR - CL) / 3, 0).x, xC2 = JP(CL + 2 * (CR - CL) / 3, 0).x;
   dashed(line(V(xC1, CZ0), V(xC1, FAR)));
   dashed(line(V(xC2, CZ0), V(xC2, FAR)));
   // through the junction (like the reference) only the A → B lane lines carry on, following the
@@ -252,9 +255,9 @@ export function initJourney(canvas, onSpeed) {
   const e = RW / 2 - 0.45;
   solid(V(-80, -e), V(XJ, -e)); solid(V(-80, e), V(XJ, e));
   solid(V(xB0, JP(0, 100).y + 0.45), V(XJ + 300, JP(0, 100).y + 0.45)); solid(V(xB0 + 6, JP(0, 165).y - 0.45), V(XJ + 300, JP(0, 165).y - 0.45));
-  solid(V(JP(197, 0).x + 0.45, CZ0 + 4), V(JP(197, 0).x + 0.45, FAR)); solid(V(JP(262, 0).x - 0.45, CZ0 + 4), V(JP(262, 0).x - 0.45, FAR));
+  solid(V(JP(197, 0).x + 0.45, CZ0 + 4), V(JP(197, 0).x + 0.45, FAR)); solid(V(JP(CR, 0).x - 0.45, CZ0 + 4), V(JP(CR, 0).x - 0.45, FAR));
   // hatched gore where the lanes to B and to C split
-  const g1 = JP(236, 140), g2 = JP(262, 168), g3 = JP(281, 141);
+  const g1 = JP(236 + (CR - 262) / 2, 140), g2 = JP(CR, 168), g3 = JP(CR + 19, 141);
   solid(g1, g2); solid(g2, g3); solid(g3, g1);
   for (let i = 1; i < 7; i++) solid(g1.clone().lerp(g2, i / 7), g1.clone().lerp(g3, i / 7), 0.12);
   const markGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);

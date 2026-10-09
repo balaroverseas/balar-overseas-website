@@ -31,7 +31,10 @@ s = lib.reset(samples=args.samples, res=(rx, ry), transparent=False)
 s.frame_start, s.frame_end = 1, LAST
 s.cycles.max_bounces = 4
 s.cycles.transparent_max_bounces = 16
-s.view_settings.exposure = -0.3      # keeps container colours saturated (AgX)
+# the reference's boxes are vivid: AgX washed them to pastels, Standard keeps the paint as authored
+s.view_settings.view_transform = 'Standard'
+s.view_settings.look = 'None'
+s.view_settings.exposure = -0.6
 rnd = random.Random(7)
 
 
@@ -40,7 +43,7 @@ rnd = random.Random(7)
 
 def roof_mat(name, color):
     """Container steel seen from above: ribs across the width, slight grime."""
-    m = mat(name, color, metal=0.2, rough=0.5, coat=0.15)
+    m = mat(name, color, metal=0.0, rough=0.7)       # matt paint: no sky sheen washing it out from above
     nt = m.node_tree
     b = nt.nodes['Principled BSDF']
     tc = nt.nodes.new('ShaderNodeTexCoord')
@@ -89,8 +92,8 @@ def sea_mat():
     nt.links.new(b1.outputs['Normal'], b2.inputs['Normal'])
     nt.links.new(b2.outputs['Normal'], b.inputs['Normal'])
     deep = nt.nodes.new('ShaderNodeValToRGB')
-    deep.color_ramp.elements[0].color = (*srgb('#020c2c'), 1)
-    deep.color_ramp.elements[1].color = (*srgb('#08215e'), 1)
+    deep.color_ramp.elements[0].color = (*srgb('#03113f'), 1)
+    deep.color_ramp.elements[1].color = (*srgb('#0a2a78'), 1)
     nt.links.new(swell.outputs['Fac'], deep.inputs['Fac'])
     cap = nt.nodes.new('ShaderNodeValToRGB')
     cap.color_ramp.elements[0].position = 0.61
@@ -176,7 +179,8 @@ prism('bulwark_fore', [(x, y) for x, y in outline if y > 40] + [(-5.0, 40), (5.0
 prism('foredeck', [(x * 0.9, y) for x, y in outline if y > 41] + [(-4.7, 41), (4.7, 41)], DECK + 1.2, DECK + 1.3, fore_m, bevel=0.05, parent=ship)
 
 # container bays: 6 bays x 6 columns of 40ft boxes with lashing bridges between
-PALETTE = ['#1f8a3a', '#d8342c', '#3022c9', '#2a6fd6', '#e2508f', '#f0f0f0', '#f2b630', '#ff7a2a', '#1c3fae', '#e8e8e8']   # saturated like the reference
+# saturated like the reference (blues, magenta/pink, violet, red, orange, the odd white/green)
+PALETTE = ['#2a6fd6', '#e2508f', '#6a2bd8', '#d8342c', '#ff7a2a', '#1c3fae', '#c2185b', '#3022c9', '#1f8a3a', '#f0f0f0', '#4fa3f0', '#ff4f6a']
 roofs = [roof_mat(f'roof{i}', c) for i, c in enumerate(PALETTE)]
 BAY_LEN, BRIDGE = 12.19, 1.5
 COLS = 5
@@ -258,18 +262,21 @@ for sgn in (-1, 1):
     s.collection.objects.link(bw)
     bw.data.materials.append(foam_mat(f'bowfoam{sgn}', length=90, scale=0.5))
     bw.location = (0, 56, 0)
+# The reference looks straight down with almost no perspective (only container roofs, no sides):
+# camera heights and lens are both VERT× the measured framing, so the footprint stays the same
+VERT = 3.0
 clouds = []
-for i, z in enumerate((300, 380, 470)):
+for i, z in enumerate((300 * VERT, 380 * VERT, 470 * VERT)):
     clouds.append(plane(f'cloud{i}', 2600, 2600, (0, 0, z), cloud_mat(f'cloud{i}', i + 1)))
 
-lib.studio_light(sun_dir=(-30, 0, -20), strength=1.7, sky_strength=0.1)   # angled sun: no glint patch under the camera (reference shows none)
+lib.studio_light(sun_dir=(-30, 0, -20), strength=1.05, sky_strength=0.08)   # angled sun: no glint patch under the camera (reference shows none)
 
 # ----------------------------------------------------------------------------- camera
 cam_data = bpy.data.cameras.new('cam')
-cam_data.lens = 48
+cam_data.lens = 48 * VERT
 cam_data.sensor_fit = 'HORIZONTAL'
 cam_data.sensor_width = 36
-cam_data.clip_end = 5000
+cam_data.clip_end = 5000 * VERT
 cam = bpy.data.objects.new('cam', cam_data)
 s.collection.objects.link(cam)
 s.camera = cam
@@ -281,7 +288,9 @@ foam_maps = [o.data.materials[0].node_tree.nodes['foam_map'] for o in [wake] + [
 
 # camera height measured off the reference (hull width on screen at each point of the section);
 # frames are spread linearly over the section (frame = 1 + 199·S/0.97), so the page needs no remap
-Z_KEYS = [(1, 70), (38, 70), (54, 79), (75, 93), (128, 152), (136, 194), (157, 267), (177, 790), (200, 1000)]
+# first frame: the section scrolls in under the end of the road scene, and like the reference the
+# container block continues the vertical road (measured at 1280×720: road 227px, boxes 258px, hull ~355px)
+Z_KEYS = [(1, 86), (21, 70), (38, 70), (54, 79), (75, 93), (128, 152), (136, 194), (157, 267), (177, 790), (200, 1000)]
 
 
 def cam_z(f):
@@ -294,10 +303,13 @@ def cam_z(f):
 
 def apply(f):
     t = (f - 1) / (LAST - 1)
-    z = cam_z(f)
-    yy = lerp(-22, 26, seg(f, 1, 75))          # glide over the bays towards the bow (reference 0–0.36)
-    yy = lerp(yy, 4, seg(f, 75, 136))          # then re-centre on the whole ship (by 0.66)
-    cam.location = (0, yy, z)
+    z = cam_z(f) * VERT
+    # glide over the bays towards the bow (reference 0–0.36: still only bays, the bridge first
+    # shows at the top edge around 0.6), then re-centre on the whole ship (by 0.66)
+    yy = lerp(-30, 10, seg(f, 1, 75))
+    yy = lerp(yy, 4, seg(f, 75, 136))
+    # the road it continues sits a touch right of centre on the page: start under it, settle centred
+    cam.location = (-0.6 * (1 - seg(f, 1, 40)), yy, z)
     sea_map.inputs['Location'].default_value = (0, -t * 90, 0)   # water streams past: ship under way
     for fm in foam_maps:
         fm.inputs['Location'].default_value = (0, -t * 90, 0)
