@@ -102,6 +102,18 @@ function setupJourney(journey) {
   // whole of phase A (journey.js A_END = 0.42); the fade happens just after it, while the live
   // scene is still holding the sequence's last framing
   const SEQ_END = 0.43, SEQ_PLAY = 0.42;
+  // scroll → Blender frame, keyed to the reference's events (fractions of the section):
+  // pick 0.15, lifted 0.19, turned 0.26, truck reversing in 0.30–0.34, set down 0.35,
+  // spreader lets go 0.38–0.40, ground up to ~60% by 0.42
+  const KEYS = [[0, 1], [0.15, 60], [0.19, 96], [0.26, 152], [0.30, 160], [0.32, 178], [0.34, 214], [0.35, 246], [0.38, 255], [0.40, 272], [0.42, 300]];
+  const frameAt = (p) => {
+    if (p <= 0) return 1;
+    for (let i = 1; i < KEYS.length; i++) {
+      const [p0, f0] = KEYS[i - 1], [p1, f1] = KEYS[i];
+      if (p <= p1) return f0 + (f1 - f0) * ((p - p0) / (p1 - p0));
+    }
+    return 300;
+  };
   let cardsMax = 0;
   const measure = () => { cardsMax = Math.max(0, cards.scrollWidth - innerWidth + 40); };
   measure();
@@ -112,7 +124,7 @@ function setupJourney(journey) {
     onUpdate: (s) => {
       const P = s.progress;
       journey && journey.setProgress(P);
-      seq.setProgress(range(P, 0, SEQ_PLAY));
+      seq.setProgress((frameAt(P) - 1) / 299);
       const so = 1 - range(P, SEQ_PLAY + 0.001, SEQ_END);
       seqWrap.style.opacity = so;
       seqWrap.style.visibility = so > 0 ? 'visible' : 'hidden';
@@ -140,14 +152,16 @@ function setupJourney(journey) {
 // ---------------------------------------------------------------- ship overlays
 function setupShip(ship) {
   const sec = $('#why');
-  const flow = $('#whyFlow'), title = $('#whyTitle');
+  const flow = $('#whyFlow'), title = $('#whyTitle'), veil = $('#shipVeil');
   // Like the reference: no text for the first ~65% (just the ship), then the title + 2-column
   // cards scroll up over it as one block at ~0.88× page speed (title centred at S≈0.7).
   ScrollTrigger.create({
     trigger: sec, start: 'top top', end: 'bottom bottom',
     onUpdate: (s) => {
       const S = s.progress;
-      ship && ship.setProgress(S);
+      // Blender frames are spread linearly over the section (frame = 1 + 199·S/0.97)
+      ship && ship.setProgress(Math.min(1, S / 0.97));
+      veil.style.opacity = 0.6 * range(S, 0.9, 1);   // the reference ends in a pale haze
       const range = sec.offsetHeight - innerHeight;
       const titleMid = 0.5 * innerHeight - 0.5 * title.offsetHeight;   // title centred at S = 0.7
       const y = titleMid - (S - 0.7) * range * 0.88;

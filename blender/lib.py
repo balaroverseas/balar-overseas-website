@@ -493,8 +493,8 @@ def cloud_mat(name, seed):
     n = node(nt, 'ShaderNodeTexNoise', Scale=0.0045, Detail=12.0, Roughness=0.62)
     nt.links.new(mp.outputs['Vector'], n.inputs['Vector'])
     ramp = nt.nodes.new('ShaderNodeValToRGB')
-    ramp.color_ramp.elements[0].position = 0.52
-    ramp.color_ramp.elements[1].position = 0.6
+    ramp.color_ramp.elements[0].position = 0.57
+    ramp.color_ramp.elements[1].position = 0.65
     nt.links.new(n.outputs['Fac'], ramp.inputs['Fac'])
     cam = nt.nodes.new('ShaderNodeCameraData')
     near = nt.nodes.new('ShaderNodeMapRange')

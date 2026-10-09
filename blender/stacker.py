@@ -153,6 +153,7 @@ FINAL = (258, 300)
 LAST = 300
 RS_A, RS_B, RS_C = -7.0, -4.5, -10.0      # stacker x: start, at the stack, after backing off
 CARRY = Vector((8.0, 0, 7.6))             # box centre in stacker-local space while carried
+CARRY_LOW = 3.0                           # box bottom once turned to face the camera (reference)
 TRUCK_X = RS_C                            # trailer centre ends under the box
 FINAL_DX = 0.3                            # last frame: camera centre relative to the trailer centre (keeps the stack out)
 BOX_Y = -CARRY.x                          # box (and truck) y once the machine faces the camera
@@ -176,6 +177,8 @@ def state(f):
     lift = seg(f, *LIFT)
     box_local = start_local.lerp(CARRY, lift)
     box_local.z += math.sin(lift * math.pi) * 0.8
+    # like the reference: while turning, the box comes down to ~3 m (its bottom), hiding the machine
+    box_local.z = lerp(box_local.z, CARRY_LOW, seg(f, TURN[0], TURN[1] + 10))
     sp_local = box_local + Vector((0, 0, SP_UP))
     # before the pick the spreader comes down from a parked position onto the box
     parked = Vector((8.5, 0, 9.8))
