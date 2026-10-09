@@ -2,7 +2,7 @@
 // Frames load progressively: first frame, then a coarse pass, then everything else,
 // so scrubbing works immediately and sharpens as frames arrive. With `lazy`, nothing
 // loads until load() or the first setProgress().
-export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contain', align = 'center', bleed = 0, anchor = null, onLayout = null, lazy = false, shadow = null, scaleAt = null }) {
+export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contain', align = 'center', bleed = 0, anchor = null, onLayout = null, lazy = false, shadow = null, scaleAt = null, view = null }) {
   const g = canvas.getContext('2d');
   const frames = new Array(count).fill(null);
   let current = 0, W = 0, H = 0, dpr = 1;
@@ -44,10 +44,16 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contai
     // 'contain' may crop up to `bleed` of the width on narrow screens so the subject stays large
     let s = fit === 'cover' ? Math.max(W / img.width, H / img.height) : Math.min((W / img.width) * (1 + bleed), H / img.height);
     if (scaleAt) s *= scaleAt(current);
-    const w = img.width * s, h = img.height * s;
-    const x = (W - w) / 2;
+    let w = img.width * s, h = img.height * s, clipW = 0;
+    let x = (W - w) / 2;
     // anchor [a, b]: put the point a (fraction of image height) at b (fraction of canvas height)
-    const y = anchor ? H * anchor[1] - h * anchor[0] : align === 'bottom' ? H - h : (H - h) / 2;
+    let y = anchor ? H * anchor[1] - h * anchor[0] : align === 'bottom' ? H - h : (H - h) / 2;
+    if (view) {                       // extra 2-D 'camera': zoom about the anchor point, then shift
+      const v = view({ x, y, w, h, W, H, frame: current });
+      const ax = W / 2, ay = anchor ? H * anchor[1] : H / 2;
+      x = ax + (x - ax) * v.s + v.dx; y = ay + (y - ay) * v.s + v.dy; w *= v.s; h *= v.s;
+      clipW = v.clip ? w * v.clip : 0;
+    }
     if (shadow) {
       // soft drop shadow from the frame's own alpha (e.g. the jet over the page)
       g.save();
@@ -56,7 +62,9 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contai
       g.drawImage(img, x + shadow.dx * w, y + shadow.dy * h, w, h);
       g.restore();
     }
+    if (clipW) { g.save(); g.beginPath(); g.rect(x, 0, clipW, H); g.clip(); }
     g.drawImage(img, x, y, w, h);
+    if (clipW) g.restore();
     onLayout && onLayout({ x, y, w, h, W, H, frame: current });
   }
 
@@ -77,6 +85,7 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contai
   return {
     get ready() { return start(); },
     load: start,
+    redraw: () => draw(),
     setProgress(p) {
       start();
       const i = Math.max(0, Math.min(count - 1, Math.round(p * (count - 1))));

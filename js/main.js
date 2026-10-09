@@ -3,6 +3,7 @@ import { sequencePlayer } from './fx/sequence.js';
 import { $, $$, range, wait, initCommon, setupReveals, setupCurves, setupFooter, revealPage } from './common.js';
 
 const { gsap, ScrollTrigger } = window;
+const smooth = (t) => t * t * (3 - 2 * t);
 // Scenes are loaded lazily so one failing WebGL scene never breaks the page.
 async function scene(name, path, fn, ...args) {
   try {
@@ -94,6 +95,17 @@ function setupJourney(journey) {
     // the reference shows the port scene smaller at first and closes in as the box turns:
     // draw the opening frames at 72% and grow to full size by the time the truck arrives
     scaleAt: (i) => 0.72 + 0.28 * Math.min(1, Math.max(0, (i - 95) / 85)) ** 2 * (3 - 2 * Math.min(1, Math.max(0, (i - 95) / 85))),
+    // services phase (0.42–0.71): the reference keeps the same loaded truck on screen, just
+    // pulled back (truck ≈10–48% across, ground at 40%) — so hold the last frame and move a 2-D
+    // 'camera' over it instead of switching to the live model
+    view: ({ y, h, W, H, frame }) => {
+      const u = smooth(range(Pnow, 0.42, 0.47));
+      if (!u) return { s: 1, dx: 0, dy: 0 };
+      const s = 1 - 0.30 * u, ay = H * 0.9;
+      const gy = y + h * (ground ? ground[frame] : 0.6);
+      // clip: the last frame's right edge still shows a sliver of the stack — keep it out of view
+      return { s, dx: -0.234 * W * u, dy: u * (0.40 * H - (ay + (gy - ay) * s)), clip: 0.9 };
+    },
     onLayout: ({ y, h, H, frame }) => {
       const g = ground ? ground[frame] : 0.87;
       seqWrap.style.setProperty('--gh', `${Math.max(0, H - (y + h * g))}px`);
@@ -101,11 +113,13 @@ function setupJourney(journey) {
   });
   // whole of phase A (journey.js A_END = 0.42); the fade happens just after it, while the live
   // scene is still holding the sequence's last framing
-  const SEQ_END = 0.43, SEQ_PLAY = 0.42;
+  const SEQ_END = 0.715, SEQ_PLAY = 0.42;   // held through the services panel, gone as the camera turns to the top view
+  let Pnow = 0;
+  const jCanvas = $('#journeyCanvas');
   // scroll → Blender frame, keyed to the reference's events (fractions of the section):
   // pick 0.15, lifted 0.19, turned 0.26, truck reversing in 0.30–0.34, set down 0.35,
   // spreader lets go 0.38–0.40, ground up to ~60% by 0.42
-  const KEYS = [[0, 1], [0.15, 60], [0.19, 96], [0.26, 152], [0.30, 160], [0.32, 178], [0.34, 214], [0.35, 246], [0.38, 255], [0.40, 272], [0.42, 300]];
+  const KEYS = [[0, 1], [0.15, 60], [0.19, 96], [0.26, 152], [0.30, 160], [0.32, 188], [0.34, 214], [0.35, 246], [0.38, 255], [0.40, 272], [0.42, 300]];
   const frameAt = (p) => {
     if (p <= 0) return 1;
     for (let i = 1; i < KEYS.length; i++) {
@@ -124,8 +138,11 @@ function setupJourney(journey) {
     onUpdate: (s) => {
       const P = s.progress;
       journey && journey.setProgress(P);
+      Pnow = P;
       seq.setProgress((frameAt(P) - 1) / 299);
-      const so = 1 - range(P, SEQ_PLAY + 0.001, SEQ_END);
+      if (P > SEQ_PLAY) seq.redraw();
+      const so = 1 - range(P, 0.705, SEQ_END);
+      jCanvas.style.opacity = 1 - so;     // the live scene only takes over for the top view
       seqWrap.style.opacity = so;
       seqWrap.style.visibility = so > 0 ? 'visible' : 'hidden';
       // B: services panel
