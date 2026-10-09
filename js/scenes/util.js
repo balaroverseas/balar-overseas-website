@@ -3,6 +3,48 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+
+// ---------- licensed models (assets/models, prepared by blender/prep_models.py; credits in CREDITS.md)
+let gltfLoader = null;
+const glbCache = new Map();
+/** Loads a (Draco-compressed) GLB once; resolves to its scene (shared — clone before adding). */
+export function loadGLB(url) {
+  if (!gltfLoader) {
+    const draco = new DRACOLoader();
+    draco.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/gltf/');
+    gltfLoader = new GLTFLoader();
+    gltfLoader.setDRACOLoader(draco);
+  }
+  if (!glbCache.has(url)) {
+    glbCache.set(url, new Promise((resolve, reject) => gltfLoader.load(url, (g) => {
+      g.scene.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      resolve(g.scene);
+    }, undefined, reject)));
+  }
+  return glbCache.get(url);
+}
+
+/**
+ * Swaps a procedural truck (buildTruck) for the real tractor + trailer model once it has loaded.
+ * The model is placed in the same local frame (container centre at x = −1.1, ground at 0, +X ahead)
+ * and its WHEEL_* nodes take over the wheel spin. If loading fails the procedural truck stays.
+ */
+export function upgradeTruck(truck) {
+  return loadGLB('assets/models/truck.glb').then((src) => {
+    const model = src.clone(true);
+    model.position.x = -1.1;
+    const wheels = [];
+    model.traverse((o) => { if (/^WHEEL_/.test(o.name)) wheels.push(o); });
+    truck.children.slice().forEach((c) => { if (!c.userData.keep) truck.remove(c); });
+    truck.add(model);
+    const R = 0.52;
+    truck.userData.spin = (dist) => wheels.forEach((w) => { w.rotation.z -= dist / R; });
+    truck.userData.model = model;
+    return truck;
+  }).catch((e) => { console.warn('[3D] truck model not loaded, keeping the built one', e); return truck; });
+}
 
 export const isMobile = () => window.matchMedia('(max-width: 860px)').matches;
 
@@ -309,7 +351,8 @@ export function buildTruck({ cab = '#1a1c21', container = null } = {}) {
 
   mergeByMaterial(truck);           // static body parts: one mesh per material
   if (container) {
-    container.position.set(TX, 2.9, 0);
+    container.position.set(TX, 2.86, 0);       // on the deck (1.56 m, same as the real trailer)
+    container.userData.keep = true;            // survives upgradeTruck()
     truck.add(container);
   }
 

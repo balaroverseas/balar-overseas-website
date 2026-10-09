@@ -1,6 +1,6 @@
 // Industries hero: top-down view of a Balar truck driving through a forest road.
 import * as THREE from 'three';
-import { createStage, makeContainer, buildTruck, seeded, lerp } from './util.js';
+import { createStage, makeContainer, buildTruck, upgradeTruck, seeded, lerp } from './util.js';
 
 export function initRoadHero(canvas) {
   const stage = createStage(canvas, { fov: 30, shadows: true, far: 2000, maxDpr: 1.5 });
@@ -70,6 +70,7 @@ export function initRoadHero(canvas) {
 
   // the truck, heading up the screen (-Z) in its lane
   const truck = buildTruck({ cab: '#141414', container: makeContainer('#e2e2e2', { label: 'BALAR OVERSEAS', labelColor: '#2a2a2a', ribTop: true }) });
+  upgradeTruck(truck);   // real tractor + trailer model once loaded
   truck.rotation.y = Math.PI / 2; // +X → -Z
   scene.add(truck);
 

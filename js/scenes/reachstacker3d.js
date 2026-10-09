@@ -12,7 +12,7 @@
 // Axes: +X forward (towards the container), +Y up, +Z towards the camera side.
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { buildWheel, canvasTex, seg, lerp, clamp01, mergeByMaterial } from './util.js';
+import { buildWheel, canvasTex, seg, lerp, clamp01, mergeByMaterial, loadGLB } from './util.js';
 
 const DEG = Math.PI / 180;
 
@@ -134,6 +134,36 @@ export function buildRibbedContainer(color = '#b4372c', label = 'BALAR OVERSEAS'
     g.add(t2);
   }
   return mergeByMaterial(g);
+}
+
+/**
+ * Swaps a built container (buildRibbedContainer) for the real 40 ft model (assets/models/
+ * container.glb, from "Container Pack" by drcrazzie, CC-BY 4.0) in the same frame: origin at the
+ * bottom centre, long axis along Z, CONT dimensions. `tint` multiplies its (light grey) paint.
+ */
+export function upgradeContainer(group, { tint = null, label = '', labelColor = '#1e2328' } = {}) {
+  return loadGLB('assets/models/container.glb').then((src) => {
+    const model = src.clone(true);
+    // GLB: 12.065 × 2.924 (high-cube) × 2.426 m, long axis X → standard 40 ft, long axis Z
+    model.rotation.y = -Math.PI / 2;
+    model.scale.set(CONT.L / 12.065, CONT.H / 2.924, CONT.W / 2.426);
+    if (tint) {
+      model.traverse((o) => {
+        if (o.isMesh) { o.material = o.material.clone(); o.material.color.set(tint); }
+      });
+    }
+    group.children.slice().forEach((c) => group.remove(c));
+    group.add(model);
+    if (label) {
+      [-1, 1].forEach((s) => {
+        const t = textPlane(label, Math.min(6.4, CONT.L * 0.72), 0.75, { color: labelColor, px: 96 });
+        t.position.set(s * (CONT.W / 2 + 0.03), CONT.H * 0.62, -CONT.L * 0.08 * s);
+        t.rotation.y = s * Math.PI / 2;
+        group.add(t);
+      });
+    }
+    return group;
+  }).catch((e) => { console.warn('[3D] container model not loaded, keeping the built one', e); return group; });
 }
 
 // ------------------------------------------------------------------ the machine
@@ -359,7 +389,10 @@ export function buildReachStacker3D({ container: withContainer = true } = {}) {
 
   // ---- container
   const container = withContainer ? buildRibbedContainer('#b4372c') : null;
-  if (container) root.add(container);
+  if (container) {
+    root.add(container);
+    upgradeContainer(container, { tint: '#c4544a', label: 'BALAR OVERSEAS', labelColor: '#ffffff' });
+  }
   parts.container = container;
 
   // fewer draw calls: bake the static parts of each moving assembly into one mesh per material

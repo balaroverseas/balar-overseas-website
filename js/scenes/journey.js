@@ -6,8 +6,8 @@
 //  C) camera orbits to a top-down view and the truck turns onto a crossing road
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { createStage, buildTruck, seg, lerp, clamp01 } from './util.js';
-import { buildReachStacker3D, buildRibbedContainer, CONT } from './reachstacker3d.js';
+import { createStage, buildTruck, upgradeTruck, seg, lerp, clamp01 } from './util.js';
+import { buildReachStacker3D, buildRibbedContainer, upgradeContainer, CONT } from './reachstacker3d.js';
 
 // phase boundaries measured off the reference: port/stacker → services panel → road
 const A_END = 0.42, B_END = 0.71;
@@ -148,12 +148,14 @@ export function initJourney(canvas, onSpeed) {
     const s = buildRibbedContainer(i ? '#d4632a' : '#1f3c8f', '');
     s.position.set(x, 0, ZP);
     scene.add(s);
+    upgradeContainer(s, { tint: i ? '#e0773d' : '#4467c4' });     // real box, tinted
     return s;
   });
   const rig = buildReachStacker3D({ container: false });
   scene.add(rig.root);
   const box = buildRibbedContainer('#c4c9cf', 'BALAR OVERSEAS', '#1e2328');
   scene.add(box);
+  upgradeContainer(box, { label: 'BALAR OVERSEAS', labelColor: '#1e2328' });
   const SP_H = rig.SP_H, H = CONT.H;
   // where the stacker stands (rig x) for the pick, and its pose then
   const PICK_REACH = 9.4;                                   // tip ahead of the rig origin
@@ -161,7 +163,7 @@ export function initJourney(canvas, onSpeed) {
   const pickTip = new THREE.Vector2(PICK_REACH, 2 * H + SP_H);
   const liftTip = new THREE.Vector2(PICK_REACH - 0.4, 2 * H + SP_H + 1.6);
   // after the turn the boom points at the camera (+Z) over the truck lane: box low over the deck
-  const DECK_Y = 1.6;                                       // truck deck (container bottom) height
+  const DECK_Y = 1.56;                                      // truck deck (container bottom) height
   // box ahead of the rig = the rig's distance behind the lane: front tyres (3.4 m ahead) stay off the road
   const CARRY_D = RW / 2 + 3.4 + 0.4;
   const carryTip = new THREE.Vector2(CARRY_D, DECK_Y + 0.4 + H + SP_H);
@@ -175,6 +177,7 @@ export function initJourney(canvas, onSpeed) {
   // same livery as the Blender truck the sequence hands over from
   const truck = buildTruck({ cab: '#1a1c21' });
   scene.add(truck);
+  upgradeTruck(truck);          // real tractor + trailer model replaces the built one once loaded
 
   // ---------- helpers
   const tanH = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
@@ -219,7 +222,7 @@ export function initJourney(canvas, onSpeed) {
   };
   // reference pacing (fractions of phase C): straight until 0.43, turn 0.43–0.55, then road C
   const pathS = (c) => (c < 0.43 ? L1 * (c / 0.43) : c < 0.55 ? L1 + TURN * ((c - 0.43) / 0.12) : L1 + TURN + 110 * ((c - 0.55) / 0.45));
-  const tmp = new THREE.Vector3(), boxOnTruck = new THREE.Vector3(-1.1, 1.6, 0);   // box origin = bottom centre, on the deck
+  const tmp = new THREE.Vector3(), boxOnTruck = new THREE.Vector3(-1.1, 1.56, 0);   // box origin = bottom centre, on the deck
   let target = 0, P = 0, snap = false, prevTruckX = null, prevTruckZ = null, lastSpeed = -1;
   // light-space axes of the (fixed-direction) sun, for texel-snapping its shadow camera
   const SUN_OFFSET = new THREE.Vector3(14, 40, 24), TEXEL = 60 / 2048;
