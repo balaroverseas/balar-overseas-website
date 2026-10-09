@@ -58,6 +58,13 @@ for o in parts.values():
 # our lettering instead of the original decal on the boom
 for i in (70, 71):
     bpy.data.objects.remove(parts.pop(i), do_unlink=True)
+# the tyres carry the same brand in white on the sidewalls: paint that lettering tyre-black
+tyre_black = mat('tyre_black', '#191919', rough=0.85)
+for i in (9, 25, 53, 65):
+    o = parts[i]
+    for k, m_ in enumerate(o.data.materials):
+        if m_ and 'F6F6F3' in m_.name:
+            o.data.materials[k] = tyre_black
 bpy.context.view_layer.update()
 
 
@@ -93,7 +100,7 @@ for barrel_i, rod_i in ((13, 14), (32, 33)):
     rams.append((g, rod_g))
 CYL0 = A0 - B0
 # spreader: its own object, origin at the twistlock bottom centre, beam along local X
-sp = empty('spreader', M(-0.2115, 0.276))
+sp = empty('spreader', M(-0.1955, 0.276))      # under the boom tip, so the head stays on it
 sp.parent = rs
 sp.rotation_euler = (0, 0, math.pi / 2)
 spfix = empty('spreader_fix', (0, 0, 0), parent=sp)
@@ -273,6 +280,17 @@ import json  # noqa: E402
 with open(os.path.join(args.out, 'meta.json'), 'w') as fh:
     # end: framing of the last frame, so the live scene can pick up exactly there
     json.dump({'count': LAST, 'ground': ground, 'end': {'width': widths[-1], 'dx': 1.35 - FINAL_DX}}, fh)
+if os.environ.get('BO_DEBUG'):
+    s.frame_set(1)
+    bpy.context.view_layer.update()
+    from mathutils import Vector as _V
+    for i in (36, 39, 69, 47, 49, 29, 35, 58):
+        o = parts.get(i)
+        if not o:
+            continue
+        bb = [o.matrix_world @ _V(c) for c in o.bound_box]
+        print('DBG', i, 'x', round(min(p.x for p in bb), 2), round(max(p.x for p in bb), 2), 'z', round(min(p.z for p in bb), 2), round(max(p.z for p in bb), 2))
+    print('DBG sp', tuple(round(v, 2) for v in sp.matrix_world.translation), 'boom', tuple(round(v, 2) for v in boom.matrix_world.translation), 'TIP0', tuple(round(v, 2) for v in TIP0), 'rs', tuple(round(v, 2) for v in rs.location))
 if args.frames == 'meta':
     sys.exit(0)
 
