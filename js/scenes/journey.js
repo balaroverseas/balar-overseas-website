@@ -134,8 +134,11 @@ export function initJourney(canvas, onSpeed) {
   scene.add(inst);
   // ---------- Port: two boxes end-on with the hero box on top, behind the truck lane (z = ZP);
   // the live reach stacker picks it, backs off turning to face the camera and sets it on the truck
-  const ZP = -9;
-  const STACK_X = [20.6, 23.04], HERO_X = (STACK_X[0] + STACK_X[1]) / 2;
+  // everything in the port stands on the white ground behind the black road (|z| < RW/2 = 7.2):
+  // the 40 ft stack (12.2 m deep) sits right behind the kerb, the stacker never drives onto the road
+  const ZP = -(RW / 2 + CONT.L / 2 + 0.3);
+  // far enough right that the widening hand-over framing (0.36–0.42) never shows it again
+  const STACK_X = [28.6, 31.04], HERO_X = (STACK_X[0] + STACK_X[1]) / 2;
   const stack = STACK_X.map((x, i) => {
     const s = buildRibbedContainer(i ? '#d4632a' : '#1f3c8f', '');
     s.position.set(x, 0, ZP);
@@ -154,7 +157,8 @@ export function initJourney(canvas, onSpeed) {
   const liftTip = new THREE.Vector2(PICK_REACH - 0.4, 2 * H + SP_H + 1.6);
   // after the turn the boom points at the camera (+Z) over the truck lane: box low over the deck
   const DECK_Y = 1.6;                                       // truck deck (container bottom) height
-  const CARRY_D = 7.5;                                      // box ahead of the rig, = the rig's distance behind the lane
+  // box ahead of the rig = the rig's distance behind the lane: front tyres (3.4 m ahead) stay off the road
+  const CARRY_D = RW / 2 + 3.4 + 0.4;
   const carryTip = new THREE.Vector2(CARRY_D, DECK_Y + 0.4 + H + SP_H);
   const downTip = new THREE.Vector2(CARRY_D, DECK_Y + H + SP_H);
   const clearTip = new THREE.Vector2(CARRY_D - 0.4, DECK_Y + H + SP_H + 0.9);   // locks open, lift clear
@@ -223,11 +227,12 @@ export function initJourney(canvas, onSpeed) {
     // spreader lifts clear 0.35–0.40 · stacker backs away 0.38–0.42 (it never vanishes)
     const XC = 3.0;                                       // box (and trailer) x once on the truck
     // after the drop it backs off, swings round to the left and drives out of the shot
-    const drive = seg(P, 0, 0.13), turnU = seg(P, 0.19, 0.26), back = seg(P, 0.365, 0.385), away = seg(P, 0.38, 0.47);
-    const rigX = lerp(lerp(RIG_PICK_X - 14, RIG_PICK_X, drive), XC, turnU) - 34 * Math.pow(away, 1.3);
+    // (fully out of the frame by 0.415, before it is switched off at 0.42)
+    const drive = seg(P, 0, 0.13), turnU = seg(P, 0.19, 0.26), back = seg(P, 0.365, 0.385), away = seg(P, 0.375, 0.415);
+    const rigX = lerp(lerp(RIG_PICK_X - 14, RIG_PICK_X, drive), XC, turnU) - 40 * Math.pow(away, 1.3);
     const rigZ = lerp(ZP, -CARRY_D, turnU) - 3.5 * back - 2 * away;
     rig.root.position.set(rigX, 0, rigZ);
-    rig.root.rotation.y = -Math.PI / 2 * turnU - Math.PI / 2 * seg(P, 0.38, 0.43);
+    rig.root.rotation.y = -Math.PI / 2 * turnU - Math.PI / 2 * seg(P, 0.375, 0.405);
     let pose;
     if (P < 0.15) pose = lerpPose(restPose, rig.solve(pickTip), seg(P, 0.04, 0.14));
     else if (P < 0.19) pose = tipPose(pickTip, liftTip, seg(P, 0.15, 0.19));
