@@ -113,20 +113,75 @@ export function initJourney(canvas, onSpeed) {
   const xC1 = JP(CL + (CR - CL) / 3, 0).x, xC2 = JP(CL + 2 * (CR - CL) / 3, 0).x;
   dashed(line(V(xC1, CZ0), V(xC1, FAR)));
   dashed(line(V(xC2, CZ0), V(xC2, FAR)));
-  // through the junction (like the reference) only the A → B lane lines carry on, following the
-  // road's own S-bend (the outer kerb's curve moved down a lane); none cross the mouth of road C
+  // through the junction (like the reference) the lane lines follow the curves: road A's first line
+  // splits into B's first line (S-bend) and C's first line (bend down); its second line runs on
+  // along the S-bend to B's second line and, where it splits, opens into the gore whose left side
+  // carries on as C's second line
   const sBend = (pyA, pyB) => new THREE.CubicBezierCurve(JP(150, pyA), JP(220, pyA), JP(230, pyB), JP(290, pyB));
+  const part = (c, u0, u1) => ({
+    getLength: () => c.getLength() * (u1 - u0),
+    getPointAt: (u) => c.getPointAt(u0 + u * (u1 - u0)),
+    getTangentAt: (u) => c.getTangentAt(u0 + u * (u1 - u0)),
+  });
+  const solidCurve = (c, w = 0.22, n = 24) => {
+    for (let i = 0; i < n; i++) solid(c.getPointAt(i / n), c.getPointAt((i + 1) / n), w);
+  };
+  const xC1px = CL + (CR - CL) / 3, xC2px = CL + 2 * (CR - CL) / 3;
   dashed(sBend(59, 121.7));
-  dashed(sBend(81, 143.3));
-  // thin edge lines just inside the kerbs of the straight runs
+  dashed(new THREE.CubicBezierCurve(JP(150, 59), JP(206, 59), JP(xC1px, 112), JP(xC1px, 165)));
+  const s2 = sBend(81, 143.3), U_T = 0.62;            // gore nose: where the second line splits
+  dashed(part(s2, 0, U_T));
+  // gore (as the reference): a curved triangle, all three sides bowed in, chevron hatch inside;
+  // its top side runs on into B's second line, its left side into C's second line
+  const gT = s2.getPointAt(U_T);
+  const gR = JP(290, 143.3), gB = JP(xC2px, 165);
+  const tp = { x: (gT.x - XJ) / K + 150, y: gT.y / K + 70 };   // the nose in sketch px
+  const top = new THREE.CubicBezierCurve(gT, JP(tp.x + 16, tp.y + 6), JP(268, 143.3), gR);
+  const left = new THREE.CubicBezierCurve(gT, JP(tp.x + 5, tp.y + 8), JP(xC2px, 150), gB);
+  const hyp = new THREE.QuadraticBezierCurve(gB, JP(xC2px, 143.3).lerp(JP(270.5, 154.2), 0.4), gR);
+  solidCurve(top, 0.2, 16); solidCurve(left, 0.2, 16); solidCurve(hyp, 0.2, 16);
+  const poly = [];
+  for (let i = 0; i <= 24; i++) poly.push(top.getPointAt(i / 24));
+  for (let i = 1; i <= 24; i++) poly.push(hyp.getPointAt(1 - i / 24));
+  for (let i = 1; i < 24; i++) poly.push(left.getPointAt(1 - i / 24));
+  const rayHit = (o, d) => {            // distance from o along d to the gore's outline
+    let best = Infinity;
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i], b = poly[(i + 1) % poly.length];
+      const ex = b.x - a.x, ez = b.y - a.y, den = d.x * ez - d.y * ex;
+      if (Math.abs(den) < 1e-9) continue;
+      const t = ((a.x - o.x) * ez - (a.y - o.y) * ex) / den;
+      const s = ((a.x - o.x) * d.y - (a.y - o.y) * d.x) / den;
+      if (t > 1e-4 && s >= 0 && s <= 1) best = Math.min(best, t);
+    }
+    return best;
+  };
+  // chevrons: apex towards the nose, arms swept back to the two outer sides
+  const bis = top.getTangentAt(0).add(left.getTangentAt(0)).normalize();
+  const armA = bis.clone().rotateAround(V(0, 0), 1.0), armB = bis.clone().rotateAround(V(0, 0), -1.0);
+  for (let k = 1; k < 9; k++) {
+    const apex = gT.clone().addScaledVector(bis, 1.15 * k);
+    const hA = rayHit(apex, armA), hB = rayHit(apex, armB);
+    if (!isFinite(hA) || !isFinite(hB) || hA < 0.3 || hB < 0.3) break;
+    solid(apex, apex.clone().addScaledVector(armA, hA), 0.14);
+    solid(apex, apex.clone().addScaledVector(armB, hB), 0.14);
+  }
+  // thin edge lines just inside the kerbs, round the corners too
   const e = RW / 2 - 0.45;
+  const edgeCurve = (c) => {
+    const n = 24, pts = [];
+    for (let i = 0; i <= n; i++) {
+      const pt = c.getPointAt(i / n), tg = c.getTangentAt(i / n);
+      pts.push(pt.add(V(-tg.y, tg.x).multiplyScalar(0.45)));
+    }
+    for (let i = 0; i < n; i++) solid(pts[i], pts[i + 1]);
+  };
+  edgeCurve(new THREE.CubicBezierCurve(JP(150, 37), JP(220, 37), JP(230, 100), JP(290, 100)));
+  edgeCurve(new THREE.CubicBezierCurve(JP(197, 165), JP(197, 130), JP(185, 103), JP(150, 103)));
+  edgeCurve(new THREE.QuadraticBezierCurve(JP(CR + 10, 165), JP(CR, 165), JP(CR, 175)));
   solid(V(-80, -e), V(XJ, -e)); solid(V(-80, e), V(XJ, e));
-  solid(V(xB0, JP(0, 100).y + 0.45), V(XJ + 300, JP(0, 100).y + 0.45)); solid(V(xB0 + 6, JP(0, 165).y - 0.45), V(XJ + 300, JP(0, 165).y - 0.45));
-  solid(V(JP(197, 0).x + 0.45, CZ0 + 4), V(JP(197, 0).x + 0.45, FAR)); solid(V(JP(CR, 0).x - 0.45, CZ0 + 4), V(JP(CR, 0).x - 0.45, FAR));
-  // hatched gore where the lanes to B and to C split
-  const g1 = JP(236 + (CR - 262) / 2, 140), g2 = JP(CR, 168), g3 = JP(CR + 19, 141);
-  solid(g1, g2); solid(g2, g3); solid(g3, g1);
-  for (let i = 1; i < 7; i++) solid(g1.clone().lerp(g2, i / 7), g1.clone().lerp(g3, i / 7), 0.12);
+  solid(V(xB0, JP(0, 100).y + 0.45), V(XJ + 300, JP(0, 100).y + 0.45)); solid(V(JP(CR + 10, 0).x, JP(0, 165).y - 0.45), V(XJ + 300, JP(0, 165).y - 0.45));
+  solid(V(JP(197, 0).x + 0.45, CZ0), V(JP(197, 0).x + 0.45, FAR)); solid(V(JP(CR, 0).x - 0.45, JP(0, 175).y), V(JP(CR, 0).x - 0.45, FAR));
   const markGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
   const markMat = new THREE.MeshBasicMaterial({ color: '#4a4a4a' });
   const inst = new THREE.InstancedMesh(markGeo, markMat, marks.length);
