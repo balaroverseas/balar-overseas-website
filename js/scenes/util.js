@@ -2,8 +2,44 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 export const isMobile = () => window.matchMedia('(max-width: 860px)').matches;
+
+/**
+ * Fewer draw calls: the plain meshes directly under `group` that share a material are baked into
+ * one mesh (their local transforms applied). Sub-groups (moving parts), instanced meshes and
+ * anything flagged `userData.keep` are left alone. Returns the group.
+ */
+export function mergeByMaterial(group) {
+  const buckets = new Map();
+  group.children.slice().forEach((o) => {
+    if (!o.isMesh || o.isInstancedMesh || o.children.length || o.userData.keep || Array.isArray(o.material) || !o.visible) return;
+    const k = o.material.uuid;
+    if (!buckets.has(k)) buckets.set(k, []);
+    buckets.get(k).push(o);
+  });
+  buckets.forEach((meshes) => {
+    if (meshes.length < 2) return;
+    const geos = meshes.map((m) => {
+      m.updateMatrix();
+      let g = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone();
+      g.applyMatrix4(m.matrix);
+      ['uv1', 'uv2', 'color'].forEach((a) => g.deleteAttribute(a));
+      if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
+      return g;
+    });
+    const merged = mergeGeometries(geos, false);
+    if (!merged) return;
+    const mesh = new THREE.Mesh(merged, meshes[0].material);
+    mesh.castShadow = meshes.some((m) => m.castShadow);
+    mesh.receiveShadow = meshes.some((m) => m.receiveShadow);
+    meshes.forEach((m) => { group.remove(m); m.geometry.dispose(); });
+    geos.forEach((g) => g.dispose());
+    group.add(mesh);
+  });
+  return group;
+}
 
 export const clamp01 = (v) => Math.min(1, Math.max(0, v));
 export const smooth = (t) => t * t * (3 - 2 * t);
@@ -182,7 +218,7 @@ export function buildWheel(r, width, rimColor = '#d9d9d9') {
     w.add(nut);
   }
   w.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-  return w;
+  return mergeByMaterial(w);        // 15 parts → 4 draw calls per wheel
 }
 
 // ---------- Semi truck (faces +X, ~16 units long) ----------
@@ -271,6 +307,7 @@ export function buildTruck({ cab = '#1a1c21', container = null } = {}) {
   add(B(0.7, 0.48, 0.5), dark, -5.4, 0.86, 0.9);                                              // toolbox
   BOGIE.forEach((x) => add(B(0.12, 0.12, 2.2), dark, x, 0.5, 0));                             // axles
 
+  mergeByMaterial(truck);           // static body parts: one mesh per material
   if (container) {
     container.position.set(TX, 2.9, 0);
     truck.add(container);

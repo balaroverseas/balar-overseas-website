@@ -12,7 +12,7 @@
 // Axes: +X forward (towards the container), +Y up, +Z towards the camera side.
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { buildWheel, canvasTex, seg, lerp, clamp01 } from './util.js';
+import { buildWheel, canvasTex, seg, lerp, clamp01, mergeByMaterial } from './util.js';
 
 const DEG = Math.PI / 180;
 
@@ -133,7 +133,7 @@ export function buildRibbedContainer(color = '#b4372c', label = 'BALAR OVERSEAS'
     t2.rotation.y = -Math.PI / 2;
     g.add(t2);
   }
-  return g;
+  return mergeByMaterial(g);
 }
 
 // ------------------------------------------------------------------ the machine
@@ -361,6 +361,9 @@ export function buildReachStacker3D({ container: withContainer = true } = {}) {
   const container = withContainer ? buildRibbedContainer('#b4372c') : null;
   if (container) root.add(container);
   parts.container = container;
+
+  // fewer draw calls: bake the static parts of each moving assembly into one mesh per material
+  [chassis, cabin, boom, boomInner, spreader, ...parts.cylinders.map((c) => c.group)].forEach(mergeByMaterial);
 
   // ---------------------------------------------------------------- kinematics
   const tmp = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);

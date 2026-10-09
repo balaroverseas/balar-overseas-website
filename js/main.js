@@ -187,6 +187,7 @@ async function boot() {
 
   setupHero(globe);
   setupJourney(journey);
+  window.__journey = journey;   // frame-by-frame inspection handle (journey.inspect(p))
   setupShip(ship);
   setupPlane();
   // fetch the ship and jet frames a few screens before they are needed

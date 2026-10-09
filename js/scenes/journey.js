@@ -45,7 +45,12 @@ export function initJourney(canvas, onSpeed) {
   // branches down into road C (+Z), with a hatched gore where they split. The truck keeps to
   // the middle lane and turns from A into C. Screen right = +X, screen down = +Z (top view).
   const RW = 14.4, LW = RW / 3;
-  const XB = 4.1 + 260;            // truck x at end of phase B
+  // phase B: the truck pulls away (speedometer 0→80 over the first 18%), then cruises at exactly
+  // the speed it keeps on road A in phase C — no sudden slow-down as the camera swings up at 0.71
+  const B_ACC = 0.18;
+  const B_DIST = (100 / 0.43) * (1 - B_ACC / 2);       // = phase C's road-A speed (L1 / 0.43 per unit c)
+  const driveB = (b) => (b < B_ACC ? (b * b) / (2 * B_ACC) : b - B_ACC / 2) / (1 - B_ACC / 2);
+  const XB = 4.1 + B_DIST;         // truck x at end of phase B
   const L1 = 100;                  // straight run on road A before the bend
   const XJ = XB + L1;              // road A starts to bend here
   const K = RW / 66;               // reference sketch (px at the zoomed-out frame) → metres
@@ -215,10 +220,17 @@ export function initJourney(canvas, onSpeed) {
   // reference pacing (fractions of phase C): straight until 0.43, turn 0.43–0.55, then road C
   const pathS = (c) => (c < 0.43 ? L1 * (c / 0.43) : c < 0.55 ? L1 + TURN * ((c - 0.43) / 0.12) : L1 + TURN + 110 * ((c - 0.55) / 0.45));
   const tmp = new THREE.Vector3(), boxOnTruck = new THREE.Vector3(-1.1, 1.6, 0);   // box origin = bottom centre, on the deck
-  let target = 0, P = 0, prevTruckX = null, prevTruckZ = null, lastSpeed = -1;
+  let target = 0, P = 0, snap = false, prevTruckX = null, prevTruckZ = null, lastSpeed = -1;
+  // light-space axes of the (fixed-direction) sun, for texel-snapping its shadow camera
+  const SUN_OFFSET = new THREE.Vector3(14, 40, 24), TEXEL = 60 / 2048;
+  const sunDir = SUN_OFFSET.clone().normalize();
+  const sunRight = new THREE.Vector3(0, 1, 0).cross(sunDir).normalize();
+  const sunUp = sunDir.clone().cross(sunRight).normalize();
+  const focus = new THREE.Vector3();
 
   stage.onFrame = (t, dt) => {
-    P = THREE.MathUtils.damp(P, target, 7, dt);
+    P = snap ? target : THREE.MathUtils.damp(P, target, 7, dt);
+    snap = false;
     const a = range(P, 0, A_END), b = range(P, A_END, B_END), c = range(P, B_END, 1);
 
     // ---------------- reach stacker + box (phase A), reference timings in P:
@@ -250,7 +262,7 @@ export function initJourney(canvas, onSpeed) {
     // truck x (A reverses in, B drives) and path (C)
     let tx, tz = 0, heading = 0;
     if (P < A_END) tx = lerp(XC + 1.1 + 60, XC + 1.1, 1 - Math.pow(1 - seg(P, 0.30, 0.34), 2));
-    else if (P < B_END) tx = XC + 1.1 + 260 * Math.pow(b, 1.35);
+    else if (P < B_END) tx = XC + 1.1 + B_DIST * driveB(b);
     else {
       const pp = pathAt(pathS(c));
       tx = pp.x; tz = pp.z; heading = pp.a;
@@ -327,6 +339,10 @@ export function initJourney(canvas, onSpeed) {
       const D = lerp(f.D, topD, k);
       const offY = lerp(f.y - 1.5, 0, k);
       const look = center.clone();
+      // start from the side view's own aim point (f.x on the z = 0 plane) and swing over to the
+      // top view's centre with the orbit — jumping straight to `center` moved the truck 150px
+      look.x = lerp(f.x, center.x, k);
+      look.z = lerp(0, center.z, k);
       look.y += offY * Math.cos(orbit);
       camera.position.set(look.x, look.y + D * Math.sin(orbit), look.z + D * Math.cos(orbit));
       camera.up.set(0, Math.cos(orbit), -Math.sin(orbit));
@@ -338,10 +354,19 @@ export function initJourney(canvas, onSpeed) {
     }
 
     // shadows follow the action: the stacker/box in the port, then the truck
-    const fx = P < A_END ? box.position.x : tx, fz = P < A_END ? box.position.z : tz;
-    sun.position.set(fx + 14, 40, fz + 24);
-    sun.target.position.set(fx, 0, fz);
+    // the focus is snapped to the shadow map's texel grid *in light space*, so shadow edges don't
+    // crawl/shimmer frame to frame as the light follows the truck
+    focus.set(P < A_END ? box.position.x : tx, 0, P < A_END ? box.position.z : tz);
+    const u = Math.round(focus.dot(sunRight) / TEXEL) * TEXEL, v = Math.round(focus.dot(sunUp) / TEXEL) * TEXEL;
+    focus.addScaledVector(sunRight, u - focus.dot(sunRight)).addScaledVector(sunUp, v - focus.dot(sunUp));
+    sun.position.copy(focus).add(SUN_OFFSET);
+    sun.target.position.copy(focus);
   };
 
-  return { setProgress(v) { target = v; }, camera, scene };
+  // `inspect` jumps straight to a progress (no damping) for frame-by-frame checks
+  return {
+    setProgress(v) { target = v; },
+    inspect(v) { target = v; snap = true; },
+    camera, scene, truck, box, rig, renderer: stage.renderer,
+  };
 }
