@@ -65,6 +65,18 @@ for i in (9, 25, 53, 65):
     for k, m_ in enumerate(o.data.materials):
         if m_ and 'F6F6F3' in m_.name:
             o.data.materials[k] = tyre_black
+# the red bracket at the boom head peeks out round the spreader head when seen end-on: same dark as the head
+parts[64].data.materials[0] = [m_ for o in parts.values() for m_ in o.data.materials if m_ and '191919' in m_.name][0]
+# the red name plates front (72) and rear (67): blank the original lettering, BALAR goes on top
+plate_txt = mat('plate_txt', '#ffffff', rough=0.4)
+for i, (xo, z, size, rz) in {67: (0.2545, 0.0275, 0.17, -math.pi / 2), 72: (-0.0505, 0.0325, 0.24, math.pi / 2)}.items():
+    o = parts[i]
+    red = [m_ for m_ in o.data.materials if m_ and 'C43527' in m_.name][0]
+    for k, m_ in enumerate(o.data.materials):
+        if m_ and 'F6F6F3' in m_.name:
+            o.data.materials[k] = red
+    p_ = M(xo, z) - Vector((0, 0, size * 0.36))
+    lib.text(f'plate_logo{i}', 'BALAR', size, tuple(p_), plate_txt, rot=(math.pi / 2, 0, rz), parent=rs, align='CENTER')
 bpy.context.view_layer.update()
 
 
@@ -131,7 +143,7 @@ stack = [c for o in stack_roots for c in [o] + list(o.children_recursive)]   # h
 hero = container('hero', '#9ea5ad', label='BALAR OVERSEAS', label_color='#1e2328')   # light grey like the reference
 
 # truck reverses in from the right (cab on the right, like the reference) under the container
-from truck import build_truck, DECK  # noqa: E402
+from truck import build_truck, DECK, TRAILER_AXLES  # noqa: E402
 truck, truck_wheels = build_truck(loc=(40, -8, 0), cab_color='#1a1c21')
 
 lib.studio_light(sun_dir=(-55, 0, -32), strength=1.1, sky_strength=0.07)   # soft fill + rim
@@ -156,7 +168,7 @@ FINAL = (258, 300)
 LAST = 300
 RS_A, RS_B, RS_C = -7.0, -4.5, -10.0      # stacker x: start, at the stack, after backing off
 CARRY = Vector((8.0, 0, 7.6))             # box centre in stacker-local space while carried
-CARRY_LOW = 3.0                           # box bottom once turned to face the camera (reference)
+CARRY_LOW = 1.75                          # box bottom once turned: just over the deck, so the truck slides in under it (reference)
 TRUCK_X = RS_C                            # trailer centre ends under the box
 FINAL_DX = 0.3                            # last frame: camera centre relative to the trailer centre (keeps the stack out)
 BOX_Y = -CARRY.x                          # box (and truck) y once the machine faces the camera
@@ -215,10 +227,10 @@ def apply(f):
         sp_world = box_world + Vector((0, 0, SP_UP)) if f >= 60 else rs_loc + rot(sp_local, th)
         sp_local_now = rot(sp_world - rs_loc, -th)
     else:
-        up = seg(f, *RELEASE)
-        base = rot(Vector((box_world.x, box_world.y, DECK + SP_UP)) - rs_loc, -th)
-        sp_local_now = base + Vector((-2.5 * up, 0, 6.5 * up))
-        sp_world = rs_loc + rot(sp_local_now, th)
+        # reference: the spreader lifts clear, then swings away out of the top-left of the frame
+        up, out = seg(f, *RELEASE), seg(f, RELEASE[1], LAST) ** 1.5
+        sp_world = Vector((box_world.x - 16.0 * out, box_world.y, DECK + SP_UP + 1.5 * up + 6.0 * out))
+        sp_local_now = rot(sp_world - rs_loc, -th)
     sp.location = sp_world
     sp.rotation_euler = (0, 0, math.pi / 2 + th)
     tx = truck_x(f)
@@ -255,6 +267,20 @@ def apply(f):
 cam, tgt = lib.lens_camera((1.1, 0, 6.24), yaw_deg=0, pitch_deg=1.5, dist=90, width=30)
 
 s.frame_end = LAST
+# like the reference, once the truck is in only the trailer shows under the box and only the spreader
+# above it: the machine's body drops out on the frame the trailer bogie passes in front of it (the
+# wheels hide the switch, the box low over the deck covers the rest), the boom with it
+HIDE_BODY = next(f for f in range(TRUCK_IN[0], LAST) if truck_x(f) + 0.5 * (TRAILER_AXLES[0] + TRAILER_AXLES[-1]) <= RS_C + 0.2)
+HIDE_BOOM = HIDE_BODY                    # one switch, not two: the boom end showed as red round the spreader head
+body = [o for o in parts.values() if o.parent == model] + [parts[i] for i in (13, 14, 32, 33)]
+body += [o for o in s.objects if o.name.startswith('plate_logo')]
+boom_parts = [o for o in s.objects if o.parent in (boom, inner) and o.type in ('MESH', 'FONT')]
+for group, at in ((body, HIDE_BODY), (boom_parts, HIDE_BOOM)):
+    for o in group:
+        for f, h in ((1, False), (at - 1, False), (at, True)):
+            o.hide_render = h
+            o.keyframe_insert('hide_render', frame=f)
+print('HIDE_BODY', HIDE_BODY, 'HIDE_BOOM', HIDE_BOOM, len(boom_parts), flush=True)
 widths = []
 for f in range(1, LAST + 1):
     widths.append(apply(f))

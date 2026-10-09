@@ -243,11 +243,11 @@ export function initJourney(canvas, onSpeed) {
   const xC1 = JP(218.7, 0).x, xC2 = JP(240.3, 0).x;
   dashed(line(V(xC1, CZ0), V(xC1, FAR)));
   dashed(line(V(xC2, CZ0), V(xC2, FAR)));
-  // through the junction: A → C (concentric) and A → B (S-bends)
-  dashed(new THREE.QuadraticBezierCurve(V(XJ, -LW / 2), V(xC2, -LW / 2), V(xC2, CZ0)));
-  dashed(new THREE.QuadraticBezierCurve(V(XJ, LW / 2), V(xC1, LW / 2), V(xC1, CZ0)));
-  dashed(new THREE.CubicBezierCurve(V(XJ, -LW / 2), V(XJ + 15, -LW / 2), V(XJ + 15, zB1), V(xB0, zB1)));
-  dashed(new THREE.CubicBezierCurve(V(XJ, LW / 2), V(XJ + 15, LW / 2), V(XJ + 15, zB2), V(xB0, zB2)));
+  // through the junction (like the reference) only the A → B lane lines carry on, following the
+  // road's own S-bend (the outer kerb's curve moved down a lane); none cross the mouth of road C
+  const sBend = (pyA, pyB) => new THREE.CubicBezierCurve(JP(150, pyA), JP(220, pyA), JP(230, pyB), JP(290, pyB));
+  dashed(sBend(59, 121.7));
+  dashed(sBend(81, 143.3));
   // thin edge lines just inside the kerbs of the straight runs
   const e = RW / 2 - 0.45;
   solid(V(-80, -e), V(XJ, -e)); solid(V(-80, e), V(XJ, e));
@@ -280,7 +280,7 @@ export function initJourney(canvas, onSpeed) {
   scene.add(box);
 
   // same livery as the Blender truck the sequence hands over from
-  const truck = buildTruck({ cab: '#1a1c21', trim: '#3b2cff', skirt: '#3b2cff' });
+  const truck = buildTruck({ cab: '#1a1c21' });
   scene.add(truck);
 
   // ---------- helpers
