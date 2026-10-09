@@ -353,6 +353,10 @@ export function initJourney(canvas, onSpeed) {
     }
     truck.position.set(tx, 0, tz);
     truck.rotation.y = -heading;
+    // the reference's road truck is ~9% bigger against the road than at the hand-over from the
+    // Blender frames: grow it while the camera swings up (nothing to compare it with mid-orbit)
+    const grow = 1 + 0.09 * ease(range(c, 0, 0.07));
+    truck.scale.setScalar(grow);
     if (prevTruckX !== null) truck.userData.spin(Math.hypot(tx - prevTruckX, tz - prevTruckZ));
     prevTruckX = tx; prevTruckZ = tz;
 
@@ -361,9 +365,11 @@ export function initJourney(canvas, onSpeed) {
       truck.localToWorld(tmp);
       box.position.copy(tmp);
       box.rotation.set(0, -heading, 0);
+      box.scale.setScalar(grow);
     } else {
       box.position.set(cx, cy, cz);
       box.rotation.set(0, boxRot, 0);
+      box.scale.setScalar(1);
     }
 
     // spreader rides on the box; after release the stacker lifts it back up and parks
