@@ -360,7 +360,9 @@ export function buildReachStacker3D({ container: withContainer = true } = {}) {
   ac(CY(0.09, 0.16, 'y', 16), M.lampA, -0.4, CH + 0.22, 0);
 
   // ---- boom: outer section about the foot pin, inner section telescopes out of it
-  const PIVOT = new THREE.Vector2(-3.5, 4.2);
+  // kinematic constants live in G so a loaded model can swap in its own (upgradeStacker)
+  const G = { PIVOT: new THREE.Vector2(-3.5, 4.2), TIP: new THREE.Vector2(9.65, -0.42), CYL_B: new THREE.Vector3(1.6, 1.42, 0), CYL_A: new THREE.Vector2(6.0, -0.75), model: null };
+  const PIVOT = G.PIVOT;
   const boom = new THREE.Group();
   boom.position.set(PIVOT.x, PIVOT.y, 0);
   root.add(boom);
@@ -397,11 +399,11 @@ export function buildReachStacker3D({ container: withContainer = true } = {}) {
   ai(RB(0.6, 0.92, 0.88, 0.08), M.blue, 9.5, -0.2, 0);                                         // boom head
   ai(CY(0.13, 1.0, 'z', 20), M.steel, 9.65, -0.42, 0);                                          // head pin
   ai(B(0.4, 0.06, 0.7), M.yellow, 9.3, 0.29, 0);
-  const TIP_LOCAL = new THREE.Vector2(9.65, -0.42);
+  const TIP_LOCAL = G.TIP;
 
   // ---- lift cylinders (two, either side of the cab front)
-  const CYL_B = new THREE.Vector3(1.6, 1.42, 0);
-  const CYL_A_LOCAL = new THREE.Vector2(6.0, -0.75);
+  const CYL_B = G.CYL_B;
+  const CYL_A_LOCAL = G.CYL_A;
   const BARREL = 2.25;
   [-1, 1].forEach((s) => {
     const g = new THREE.Group();
@@ -465,7 +467,7 @@ export function buildReachStacker3D({ container: withContainer = true } = {}) {
 
   // ---------------------------------------------------------------- kinematics
   const tmp = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
-  const L0 = TIP_LOCAL.length(), BETA = Math.atan2(TIP_LOCAL.y, TIP_LOCAL.x);
+
   const tipFor = (angle, ext) => new THREE.Vector2(
     PIVOT.x + Math.cos(angle) * (TIP_LOCAL.x + ext) - Math.sin(angle) * TIP_LOCAL.y,
     PIVOT.y + Math.sin(angle) * (TIP_LOCAL.x + ext) + Math.cos(angle) * TIP_LOCAL.y,
@@ -497,6 +499,12 @@ export function buildReachStacker3D({ container: withContainer = true } = {}) {
       eye.position.y = len;
       rod.position.set(0, 0, 0);
     });
+    if (G.model) {                                   // model's twin cylinders: turn to the boom pin, stretch
+      const { cyl, len } = G.model;
+      const dir = new THREE.Vector3(A.x - CYL_B.x, A.y - CYL_B.y, 0);
+      cyl.scale.y = dir.length() / len;
+      cyl.quaternion.setFromUnitVectors(up, dir.normalize());
+    }
     lights.forEach((l) => {
       l.material.color.setRGB(lerp(1, 0.2, lock), lerp(0.23, 0.95, lock), lerp(0.18, 0.35, lock));
       l.material.emissive.setRGB(lerp(1, 0.1, lock), lerp(0.13, 0.9, lock), lerp(0.06, 0.25, lock));
@@ -508,7 +516,59 @@ export function buildReachStacker3D({ container: withContainer = true } = {}) {
     return tip;
   };
 
-  return { root, parts, apply, solve, tipFor, SP_H, PIVOT };
+  return { root, parts, apply, solve, tipFor, SP_H, PIVOT, G };
+}
+
+/**
+ * Swaps the built stacker for the textured model (Meshy "Reach Stacker" by oguz.backovski, CC0;
+ * cut into parts by blender/prep_stacker.py). The model's own joints replace the kinematic
+ * constants; the tip contract (solve/apply, SP_H) stays, so every pose keeps working.
+ */
+export function upgradeStacker(rig) {
+  return loadGLB('assets/models/stacker.glb').then((src) => {
+    const { parts, G } = rig;
+    const get = (n) => {
+      const o = src.getObjectByName(n);
+      if (!o) return null;
+      const c = o.clone(true);
+      c.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
+      return c;
+    };
+    // hide the built meshes (the telescope group itself is a child of the boom: it stays)
+    [parts.chassis, parts.cabin, parts.boom, parts.boomInner, parts.spreader].forEach((g) => g.children.forEach((c) => { if (c !== parts.boomInner) c.visible = false; }));
+    parts.cylinders.forEach((c) => { c.group.visible = false; });
+    parts.wheels.forEach((w) => { w.visible = false; });
+    // joints measured off the model (blender/prep_stacker.py), metres
+    G.PIVOT.set(-3.2, 3.35);
+    G.TIP.set(9.60, -0.13);
+    G.CYL_B.set(1.64, 1.29, 0);
+    G.CYL_A.set(2.675, 0.725);
+    parts.boom.position.set(G.PIVOT.x, G.PIVOT.y, 0);
+    parts.root.add(get('STK_BODY'));
+    parts.boom.add(get('STK_BOOM'));
+    parts.boomInner.add(get('STK_INNER'));
+    const sp = get('STK_SPREADER');
+    sp.position.y = -(rig.SP_H - 1.70);              // model: head pin -> twistlocks 1.70 m
+    parts.spreader.add(sp);
+    const cyl = new THREE.Group();
+    cyl.position.copy(G.CYL_B);
+    cyl.add(get('STK_CYL'));
+    parts.root.add(cyl);
+    G.model = { cyl, len: 4.1814 };
+    const hubs = [[2.6, 0.72], [2.6, 0.72], [-3.4, 0.72], [-3.4, 0.72]];
+    const wheels = [];
+    hubs.forEach(([x, y], k) => {
+      const w = get(`STK_WHEEL_${k}`);
+      if (!w) return;
+      const g = new THREE.Group();
+      g.position.set(x, y, 0);
+      g.add(w);
+      parts.root.add(g);
+      wheels.push(g);
+    });
+    parts.wheels.splice(0, parts.wheels.length, ...wheels);
+    return rig;
+  }).catch((e) => { console.warn('[3D] stacker model not loaded, keeping the built one', e); return rig; });
 }
 
 // ------------------------------------------------------------------ choreography

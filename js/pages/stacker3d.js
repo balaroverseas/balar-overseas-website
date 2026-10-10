@@ -3,7 +3,7 @@
 //   <section class="rs3d" data-rs3d> … <canvas class="rs3d-canvas"></canvas> … </section>
 import * as THREE from 'three';
 import { createStage, isMobile, lerp, seg } from '../scenes/util.js';
-import { buildReachStacker3D, buildYard, choreography, STAGES, DEG } from '../scenes/reachstacker3d.js';
+import { buildReachStacker3D, buildYard, choreography, STAGES, DEG, upgradeStacker } from '../scenes/reachstacker3d.js';
 
 function webglOK() {
   try {
@@ -59,6 +59,7 @@ export function mountReachStacker(section) {
 
   scene.add(buildYard());
   const rig = buildReachStacker3D();
+  upgradeStacker(rig);
   scene.add(rig.root);
   const poseAt = choreography(rig, 9.0);
 

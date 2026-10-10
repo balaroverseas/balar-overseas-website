@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { createStage, buildTruck, upgradeTruck, seg, lerp, clamp01 } from './util.js';
-import { buildReachStacker3D, buildRibbedContainer, upgradeContainer, CONT } from './reachstacker3d.js';
+import { buildReachStacker3D, buildRibbedContainer, upgradeContainer, upgradeStacker, CONT } from './reachstacker3d.js';
 
 // phase boundaries measured off the reference: port/stacker → services panel → road
 const A_END = 0.42, B_END = 0.71;
@@ -194,6 +194,7 @@ export function initJourney(canvas, onSpeed) {
     return s;
   });
   const rig = buildReachStacker3D({ container: false });
+  upgradeStacker(rig);
   scene.add(rig.root);
   const box = buildRibbedContainer('#c4c9cf', 'BALAR OVERSEAS', '#1e2328');
   scene.add(box);

@@ -9,3 +9,7 @@ The website's truck, trailer and shipping containers are built from these Sketch
 | 40 ft shipping containers | [Container Pack](https://sketchfab.com/3d-models/container-pack-0d416a9bcfc14978aa50e80281dfe9a5) | [drcrazzie](https://sketchfab.com/drcrazzie) | [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/) |
 
 The changed trailer (part of `assets/models/truck.glb`) is shared under the same CC BY-SA 4.0 licence, as that licence requires. "MAN" is a trademark of its owner. The site shows no MAN branding, and Balar Overseas has no connection with that company.
+
+## Reach stacker
+
+The reach stacker is the [Reach Stacker](https://www.meshy.ai/3d-models/reach-stacker-01a03643-ad8b-7c05-908b-2c90547748a3) model by oguz.backovski on Meshy, released under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). No credit is required; it is listed here for the record. For this site, the maker's lettering was painted out of the texture, and the mesh was simplified, rescaled and cut into moving parts. The spreader arms were also lengthened to reach a 40 ft box. `blender/prep_stacker.py` holds these steps, and the result is `assets/models/stacker.glb`. The site shows no machine-maker branding.
