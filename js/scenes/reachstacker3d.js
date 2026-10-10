@@ -654,8 +654,8 @@ function buildUCBody(root, pivot) {
     add(new THREE.BoxGeometry(0.02, 1.6, 0.006), seam, -3.0, 1.55, s * 1.012);
   });
   // logo on the hull side (camera side), like the reference's small white mark
-  const logo = textPlane('BALAR OVERSEAS', 1.2, 0.18, { color: '#ffffff', px: 120, weight: 800 });
-  logo.position.set(0.95, 1.05, 0.725);              // between the steps and the front tyres
+  const logo = textPlane('BALAR OVERSEAS', 1.15, 0.16, { color: '#ffffff', px: 84, weight: 800 });
+  logo.position.set(0.98, 1.05, 0.725);              // between the steps and the front tyres
   g.add(logo);
   // mudguards over the wheels (outside the hull): front over the twin tyres, rear over the single
   const guard = (x, zIn, zOut, r) => {
@@ -671,30 +671,78 @@ function buildUCBody(root, pivot) {
   };
   guard(2.6, 0.72, 2.02, R_W);
   guard(-3.4, 1.0, 1.92, R_W);
-  // boom towers: twin teal plates from the counterweight up round the foot pin, with the pin
-  [-1, 1].forEach((s) => {
+  // boom tower: one solid teal block (as the reference), its back curving up from the counterweight,
+  // tapering to the foot pin; the boom heel sits in it with the pin through
+  {
     const shp = new THREE.Shape();
-    shp.moveTo(-3.55, 2.3); shp.lineTo(-2.05, 1.75); shp.lineTo(-2.25, pivot.y - 0.05);
-    shp.absarc(pivot.x, pivot.y, 0.45, 0, Math.PI, false); shp.lineTo(-3.3, pivot.y - 0.5); shp.lineTo(-3.55, 2.3);
-    const geo = new THREE.ExtrudeGeometry(shp, { depth: 0.14, bevelEnabled: true, bevelSize: 0.03, bevelThickness: 0.03, bevelSegments: 3 });
-    const m = add(geo, paint);
-    m.position.z = s * 0.62 - 0.07;
-  });
+    shp.moveTo(-3.8, 2.3); shp.lineTo(-1.95, 1.8); shp.lineTo(-2.15, pivot.y - 0.25);
+    shp.absarc(pivot.x, pivot.y, 0.5, -0.2, Math.PI * 0.95, false);
+    shp.quadraticCurveTo(-3.45, pivot.y - 0.35, -3.8, 2.3);
+    const geo = new THREE.ExtrudeGeometry(shp, { depth: 1.18, bevelEnabled: true, bevelSize: 0.06, bevelThickness: 0.06, bevelSegments: 3, curveSegments: 24 });
+    geo.translate(0, 0, -0.59);
+    add(geo, paint);
+  }
   add(new THREE.CylinderGeometry(0.17, 0.17, 1.62, 24).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#8d96a2', roughness: 0.3, metalness: 0.9 }), pivot.x, pivot.y, 0);
-  // cab: black frame on a plinth, on the camera side clear of the boom, big tinted glass
-  const CX0 = -1.2, CX1 = 0.3, CY0 = 1.95, CY1 = 3.42, CZ = 0.98, CW = 1.18;
-  add(new THREE.BoxGeometry(1.75, 0.16, 1.35), black, (CX0 + CX1) / 2, 1.88, CZ);
-  add(new RoundedBoxGeometry(CX1 - CX0, CY1 - CY0, CW, 3, 0.05), black, (CX0 + CX1) / 2, (CY0 + CY1) / 2, CZ);
-  add(new RoundedBoxGeometry(CX1 - CX0 + 0.12, 0.09, CW + 0.12, 2, 0.03), black, (CX0 + CX1) / 2, CY1 + 0.04, CZ);   // roof
-  const pane = (w, h, x, y, z, ry) => { const m = add(new THREE.PlaneGeometry(w, h), glass, x, y, z); m.rotation.y = ry; };
-  pane(CW - 0.16, 1.05, CX1 + 0.006, 2.82, CZ, Math.PI / 2);                     // windscreen
-  pane(CX1 - CX0 - 0.5, 1.0, CX0 + 0.62, 2.84, CZ + CW / 2 + 0.006, 0);        // side window
-  pane(0.32, 1.2, CX1 - 0.22, 2.72, CZ + CW / 2 + 0.006, 0);                    // door glass
-  pane(CW - 0.2, 0.9, CX0 - 0.006, 2.9, CZ, -Math.PI / 2);                      // rear window
-  add(new THREE.BoxGeometry(0.03, 1.25, 0.03), dark, CX1 - 0.4, 2.72, CZ + CW / 2 + 0.012);    // door seam
-  add(new THREE.BoxGeometry(0.12, 0.03, 0.03), new THREE.MeshStandardMaterial({ color: '#9aa1aa', metalness: 0.8, roughness: 0.3 }), CX1 - 0.48, 2.5, CZ + CW / 2 + 0.03);
+  // hydraulic lines leaving the tower side in four tidy U loops (reference), and a black junction box
+  const hoseM = new THREE.MeshStandardMaterial({ color: '#101113', roughness: 0.6 });
+  [-1, 1].forEach((s) => {
+    for (let i = 0; i < 4; i++) {
+      const y = pivot.y - 0.95 + i * 0.09, z0 = s * 0.66, z1 = s * 0.86;
+      const c = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(-3.42, y, z0), new THREE.Vector3(-3.42, y, z1), new THREE.Vector3(-3.36, y, z1 + s * 0.02),
+        new THREE.Vector3(-2.98, y - 0.02, z1), new THREE.Vector3(-2.92, y - 0.02, z0),
+      ]);
+      add(new THREE.TubeGeometry(c, 24, 0.028, 8), hoseM);
+    }
+    add(new THREE.BoxGeometry(0.34, 0.3, 0.08), black, -2.75, 2.25, s * 0.64);
+  });
+  // amber beacon on a slim mast at the back of the tower (reference)
+  add(new THREE.CylinderGeometry(0.018, 0.018, 0.9, 8), black, -3.25, pivot.y + 0.1, 0.5);
+  add(new THREE.CylinderGeometry(0.06, 0.07, 0.11, 16), lampA, -3.25, pivot.y + 0.6, 0.5);
+  // cab: open black frame (thin pillars, solid lower panels, roof) round clear glass, so the seat,
+  // the operator and the controls show through like the reference's
+  const CX0 = -1.2, CX1 = 0.3, CY0 = 1.95, CY1 = 3.42, CZ = 0.98, CW = 1.18, LOW = 2.32;
+  const cx = (CX0 + CX1) / 2, cl = CX1 - CX0;
+  add(new THREE.BoxGeometry(1.75, 0.16, 1.35), black, cx, 1.88, CZ);                        // plinth
+  add(new THREE.BoxGeometry(cl, LOW - CY0, CW), black, cx, (CY0 + LOW) / 2, CZ);            // lower panels
+  add(new RoundedBoxGeometry(cl + 0.12, 0.1, CW + 0.12, 2, 0.03), black, cx, CY1 + 0.04, CZ);   // roof
+  const PIL = 0.06;
+  [[CX0, -1], [CX0, 1], [CX1, -1], [CX1, 1], [CX1 - 0.42, 1]].forEach(([x, sz]) => add(new THREE.BoxGeometry(PIL, CY1 - LOW, PIL), black, x + (x === CX0 ? PIL / 2 : -PIL / 2), (LOW + CY1) / 2, CZ + sz * (CW / 2 - PIL / 2)));
+  add(new THREE.BoxGeometry(cl, 0.05, PIL), black, cx, 2.95, CZ + CW / 2 - PIL / 2);         // side rail
+  const clear = new THREE.MeshPhysicalMaterial({ color: '#b9c9d3', roughness: 0.05, metalness: 0, transparent: true, opacity: 0.22, depthWrite: false, clearcoat: 1, envMapIntensity: 1.4, side: THREE.DoubleSide });
+  const pane = (w, h, x, y, z, ry) => { const m = add(new THREE.PlaneGeometry(w, h), clear, x, y, z); m.rotation.y = ry; m.castShadow = false; m.renderOrder = 2; };
+  const GH = CY1 - LOW;
+  pane(CW - 0.1, GH, CX1 - 0.004, (LOW + CY1) / 2, CZ, Math.PI / 2);                       // windscreen
+  pane(cl - 0.1, GH, cx, (LOW + CY1) / 2, CZ + CW / 2 - 0.004, 0);                          // side (door side)
+  pane(cl - 0.1, GH, cx, (LOW + CY1) / 2, CZ - CW / 2 + 0.004, 0);                          // far side
+  pane(CW - 0.1, GH, CX0 + 0.004, (LOW + CY1) / 2, CZ, -Math.PI / 2);                       // rear
+  // inside: seat, operator, steering column and wheel, side console
+  const seatM = new THREE.MeshStandardMaterial({ color: '#2c2f34', roughness: 0.8 });
+  const suit = new THREE.MeshStandardMaterial({ color: '#2a3442', roughness: 0.85 });
+  const skin = new THREE.MeshStandardMaterial({ color: '#b98a6a', roughness: 0.7 });
+  add(new THREE.BoxGeometry(0.5, 0.12, 0.5), seatM, cx - 0.2, LOW + 0.18, CZ);
+  add(new THREE.BoxGeometry(0.12, 0.62, 0.48), seatM, cx - 0.47, LOW + 0.5, CZ);
+  add(new THREE.CapsuleGeometry(0.17, 0.42, 4, 10), suit, cx - 0.25, LOW + 0.62, CZ);         // torso
+  add(new THREE.SphereGeometry(0.11, 16, 12), skin, cx - 0.22, LOW + 1.0, CZ);                // head
+  add(new THREE.SphereGeometry(0.118, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#f2b51c', roughness: 0.5 }), cx - 0.22, LOW + 1.06, CZ);   // sits on top, face left clear   // hard hat
+  add(new THREE.CapsuleGeometry(0.06, 0.32, 4, 8), suit, cx + 0.02, LOW + 0.55, CZ - 0.17).rotation.z = 1.2;   // arms to the wheel
+  add(new THREE.CapsuleGeometry(0.06, 0.32, 4, 8), suit, cx + 0.02, LOW + 0.55, CZ + 0.17).rotation.z = 1.2;
+  add(new THREE.CylinderGeometry(0.04, 0.05, 0.55, 10), black, cx + 0.38, LOW + 0.25, CZ).rotation.z = 0.5;
+  const sw = add(new THREE.TorusGeometry(0.15, 0.022, 8, 24), black, cx + 0.28, LOW + 0.5, CZ);
+  sw.rotation.y = Math.PI / 2; sw.rotation.x = 0.6;
+  add(new THREE.BoxGeometry(0.3, 0.35, 0.18), seatM, cx - 0.05, LOW + 0.2, CZ + 0.4);
+  // mirror arm on the front corner, door handle, the yellow strip on the cab side
+  add(new THREE.BoxGeometry(0.32, 0.025, 0.025), black, CX1 + 0.14, CY1 - 0.35, CZ + CW / 2 + 0.06);
+  add(new THREE.BoxGeometry(0.04, 0.24, 0.14), black, CX1 + 0.3, CY1 - 0.48, CZ + CW / 2 + 0.06);
+  add(new THREE.BoxGeometry(0.12, 0.03, 0.03), new THREE.MeshStandardMaterial({ color: '#9aa1aa', metalness: 0.8, roughness: 0.3 }), CX1 - 0.5, 2.45, CZ + CW / 2 + 0.03);
+  add(new THREE.BoxGeometry(0.42, 0.05, 0.005), lampA, cx + 0.1, LOW - 0.1, CZ + CW / 2 + 0.004);
   add(new THREE.CylinderGeometry(0.07, 0.08, 0.12, 16), lampA, CX0 + 0.25, CY1 + 0.15, CZ);  // beacon
   [-1, 1].forEach((s) => add(new THREE.BoxGeometry(0.06, 0.08, 0.16), lampW, CX1 + 0.04, CY1 - 0.06, CZ + s * 0.4));
+  // hull side details (reference): two black inset boxes, yellow warning sticker at the front,
+  // small amber side markers
+  [[-1.95, 1.3], [-1.35, 1.3]].forEach(([x, y]) => add(new THREE.BoxGeometry(0.5, 0.28, 0.02), black, x, y, 0.73));
+  add(new THREE.BoxGeometry(0.34, 0.14, 0.005), new THREE.MeshStandardMaterial({ color: '#f2b51c', roughness: 0.5 }), 2.95, 1.6, 0.725);
+  [[-2.2, 1.65], [2.2, 1.65]].forEach(([x, y]) => add(new THREE.BoxGeometry(0.1, 0.05, 0.01), lampA, x, y, 0.726));
   // steps up to the cab (black ladder box with treads) on the camera side
   // two thin stringers, open treads
   [-0.3, 0.2].forEach((x) => add(new THREE.BoxGeometry(0.04, 1.25, 0.04), black, x, 1.18, 0.98));
