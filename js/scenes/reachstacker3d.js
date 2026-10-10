@@ -706,7 +706,7 @@ function buildUCBody(root, pivot) {
   });
   // cab: open black frame (thin pillars, solid lower panels, roof) round clear glass, so the seat,
   // the operator and the controls show through like the reference's
-  const CX0 = -1.2, CX1 = 0.3, CY0 = 1.95, CY1 = 3.6, CZ = 0.98, CW = 1.18, LOW = 2.32;   // tall cab (reference): head clear of the roof
+  const CX0 = -1.2, CX1 = 0.3, CY0 = 1.95, CY1 = 3.42, CZ = 0.98, CW = 1.18, LOW = 2.32;   // cab height as before: clear of the boom and lift cylinder
   const cx = (CX0 + CX1) / 2, cl = CX1 - CX0;
   add(new THREE.BoxGeometry(1.75, 0.16, 1.35), black, cx, 1.88, CZ);                        // plinth
   add(new THREE.BoxGeometry(cl, LOW - CY0, CW), black, cx, (CY0 + LOW) / 2, CZ);            // lower panels
@@ -727,11 +727,11 @@ function buildUCBody(root, pivot) {
   const skin = new THREE.MeshStandardMaterial({ color: '#b98a6a', roughness: 0.7 });
   add(new THREE.BoxGeometry(0.5, 0.12, 0.5), seatM, cx - 0.2, LOW + 0.18, CZ);
   add(new THREE.BoxGeometry(0.12, 0.62, 0.48), seatM, cx - 0.47, LOW + 0.5, CZ);
-  add(new THREE.CapsuleGeometry(0.17, 0.42, 4, 10), suit, cx - 0.25, LOW + 0.55, CZ);         // torso
-  add(new THREE.SphereGeometry(0.11, 16, 12), skin, cx - 0.22, LOW + 0.9, CZ);                // head
-  add(new THREE.SphereGeometry(0.118, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#f2b51c', roughness: 0.5 }), cx - 0.22, LOW + 0.96, CZ);   // sits on top, face left clear   // hard hat
-  add(new THREE.CapsuleGeometry(0.06, 0.32, 4, 8), suit, cx + 0.02, LOW + 0.55, CZ - 0.17).rotation.z = 1.2;   // arms to the wheel
-  add(new THREE.CapsuleGeometry(0.06, 0.32, 4, 8), suit, cx + 0.02, LOW + 0.55, CZ + 0.17).rotation.z = 1.2;
+  add(new THREE.CapsuleGeometry(0.14, 0.3, 4, 10), suit, cx - 0.25, LOW + 0.45, CZ);         // torso
+  add(new THREE.SphereGeometry(0.09, 16, 12), skin, cx - 0.22, LOW + 0.74, CZ);                // head
+  add(new THREE.SphereGeometry(0.097, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#f2b51c', roughness: 0.5 }), cx - 0.22, LOW + 0.79, CZ);   // sits on top, face left clear   // hard hat
+  add(new THREE.CapsuleGeometry(0.05, 0.26, 4, 8), suit, cx + 0.0, LOW + 0.46, CZ - 0.14).rotation.z = 1.2;   // arms to the wheel
+  add(new THREE.CapsuleGeometry(0.05, 0.26, 4, 8), suit, cx + 0.0, LOW + 0.46, CZ + 0.14).rotation.z = 1.2;
   add(new THREE.CylinderGeometry(0.04, 0.05, 0.55, 10), black, cx + 0.38, LOW + 0.25, CZ).rotation.z = 0.5;
   const sw = add(new THREE.TorusGeometry(0.15, 0.022, 8, 24), black, cx + 0.28, LOW + 0.5, CZ);
   sw.rotation.y = Math.PI / 2; sw.rotation.x = 0.6;
