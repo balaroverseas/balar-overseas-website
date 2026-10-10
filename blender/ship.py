@@ -188,6 +188,65 @@ truck_box = roof_mat('roof_truckbox', '#c4c9cf')
 TRUCK_COL, TRUCK_BAYS = 2, (0, 1, 2, 3)
 BAY_LEN, BRIDGE = 12.19, 1.5
 COLS = 5
+TIER = 2.59
+
+
+# the top tier of every stack is the same 40 ft container model the truck carries (Sketchfab, CC BY,
+# see CREDITS.md), tinted per box; the tiers under it are plain boxes in the same colour
+def load_container():
+    path = os.path.join(os.path.dirname(__file__), '..', 'assets', 'models', 'container.glb')
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=os.path.abspath(path))
+    src = next(o for o in bpy.data.objects if o not in before and o.type == 'MESH')
+    me = src.data.copy()
+    me.transform(src.matrix_world)
+    # model: length along X, origin bottom centre (12.07 x 2.43 x 2.92) -> one bay: 2.44 x 12.19 x 2.59, length along Y
+    me.transform(__import__('mathutils').Matrix.Rotation(math.pi / 2, 4, 'Z'))
+    me.transform(__import__('mathutils').Matrix.Diagonal((2.44 / 2.426, BAY_LEN / 12.066, TIER / 2.924, 1)))
+    for o in [o for o in bpy.data.objects if o not in before]:
+        bpy.data.objects.remove(o, do_unlink=True)
+    return me
+
+
+def tinted(base, name, color, linear=None):
+    """Copy of the container material with its (light grey) paint multiplied by `color`."""
+    m = base.copy()
+    m.name = name
+    nt = m.node_tree
+    b = nt.nodes['Principled BSDF']
+    link = next(lk for lk in nt.links if lk.to_socket == b.inputs['Base Color'])
+    mix = nt.nodes.new('ShaderNodeMix')
+    mix.data_type = 'RGBA'
+    mix.blend_type = 'MULTIPLY'
+    rgba = lambda socks, n: next(sk for sk in socks if sk.name == n and sk.type == 'RGBA')
+    mix.inputs['Factor'].default_value = 1.0
+    rgba(mix.inputs, 'B').default_value = (*(linear or srgb(color)), 1)
+    nt.links.new(link.from_socket, rgba(mix.inputs, 'A'))
+    nt.links.new(rgba(mix.outputs, 'Result'), b.inputs['Base Color'])
+    b.inputs['Roughness'].default_value = 0.7          # matt paint from above, like the plain tiers
+    return m
+
+
+cont_mesh = load_container()
+cont_base = cont_mesh.materials[0]
+# the grey texture reads ~0.8 bright: lift the tint so a tinted box comes out at the palette colour
+lift = lambda c: '#%02x%02x%02x' % tuple(min(255, round(int(c[i:i + 2], 16) * 1.2)) for i in (1, 3, 5))
+cont_tints = [tinted(cont_base, f'cont{i}', lift(c)) for i, c in enumerate(PALETTE)]
+# the truck's box on the page reads (190,192,194) from above; under this sun the untinted texture
+# came out (167,163,157): lifted and cooled (linear gains) so the hand-over matches
+cont_truck = tinted(cont_base, 'cont_truckbox', None, linear=(1.22, 1.32, 1.47))
+
+
+def top_box(name, x, yc, z0, m_):
+    o = bpy.data.objects.new(name, cont_mesh)
+    s.collection.objects.link(o)
+    o.parent = ship
+    o.location = (x, yc, z0)
+    o.material_slots[0].link = 'OBJECT'
+    o.material_slots[0].material = m_
+    return o
+
+
 y = -50.0                                  # bays from the stern up to the forward bridge
 for bay in range(6):
     yc = y + BAY_LEN / 2
@@ -195,11 +254,16 @@ for bay in range(6):
     for c in range(COLS):
         x = (c - (COLS - 1) / 2) * 2.5
         tiers = max(2, tiers_base + rnd.choice((-1, 0, 0, 0, 1)))
-        h = tiers * 2.59
-        m_ = rnd.choice(roofs)
         if c == TRUCK_COL and bay in TRUCK_BAYS:
-            m_ = truck_box
-        box(f'stack{bay}_{c}', (2.44, BAY_LEN, h), (x, yc, DECK + 0.3 + h / 2), m_, bevel=0.04, segments=1, parent=ship)
+            tiers = 6                      # tallest: no neighbour shades the column the truck lands on
+        h = tiers * TIER
+        k = rnd.randrange(len(roofs))
+        m_, top_m = roofs[k], cont_tints[k]
+        if c == TRUCK_COL and bay in TRUCK_BAYS:
+            m_, top_m = truck_box, cont_truck
+        lower = h - TIER
+        box(f'stack{bay}_{c}', (2.42, BAY_LEN - 0.02, lower), (x, yc, DECK + 0.3 + lower / 2), m_, bevel=0.04, segments=1, parent=ship)
+        top_box(f'top{bay}_{c}', x, yc, DECK + 0.3 + lower, top_m)
     # hatch coaming under the stacks
     box(f'coaming{bay}', (COLS * 2.5 + 0.6, BAY_LEN + 0.4, 0.5), (0, yc, DECK + 0.1), rim_m, bevel=0.05, parent=ship)
     # lashing bridge forward of the bay
