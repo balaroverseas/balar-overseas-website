@@ -137,9 +137,9 @@ rr, gg, bb = src[..., 0], src[..., 1], src[..., 2]
 h = np.where(mx_ == rr, ((gg - bb) / d) % 6, np.where(mx_ == gg, (bb - rr) / d + 2, (rr - gg) / d + 4)) / 6.0
 is_yel_px = (h > 25 / 360) & (h < 70 / 360) & (s > 0.4) & (v > 0.3)
 is_red_px = ((h < 18 / 360) | (h > 340 / 360)) & (s > 0.45) & (v > 0.2)
-is_navy_px = (h > 200 / 360) & (h < 260 / 360) & (s > 0.25) & (v < 0.6)
+is_navy_px = (h > 200 / 360) & (h < 300 / 360) & (s > 0.2) & (v < 0.65)   # navy and the lilac glass tints
 H2, S2, V2 = h.copy(), s.copy(), v.copy()
-H2[is_yel_px], S2[is_yel_px], V2[is_yel_px] = 199 / 360, np.clip(s[is_yel_px] * 0.68, 0, 1), v[is_yel_px] * 0.74   # teal-blue body
+H2[is_yel_px], S2[is_yel_px], V2[is_yel_px] = 199 / 360, np.clip(s[is_yel_px] * 0.8, 0, 1), v[is_yel_px] * 0.66   # teal-blue body (reference ~ 72,150,186)
 for m_ in (is_red_px, is_navy_px):                                                                                  # charcoal boom
     H2[m_], S2[m_], V2[m_] = 215 / 360, 0.16, np.clip(v[m_] * 0.24 + 0.04, 0, 1)
 i_ = np.floor(H2 * 6).astype(int) % 6
@@ -182,34 +182,12 @@ def frame(origin, angle=0.0):
 
 
 DEC = 0.6
-extract('STK_BODY', [0], Matrix.Identity(4), DEC)
-boom_frame = frame(PIVOT, BOOM0)              # rotating by +angle about Y maps the boom axis onto +X
-extract('STK_BOOM', [1], boom_frame, DEC)
-inner = extract('STK_INNER', [2], boom_frame, DEC)
-# sleeve: a slimmer copy of the outer section just behind the telescope, hidden inside the boom
-# the journey runs the telescope out up to 4.9 m: the sleeve covers 5.3 m
-sleeve_ids = np.nonzero((part == 1) & (lx > INNER_FROM - 5.3) & (lx < INNER_FROM))[0]
-part_bak = part.copy()
-part[sleeve_ids] = 99
-sl = extract('STK_SLEEVE', [99], boom_frame, DEC)
-part = part_bak
-sl.data.transform(Matrix.Diagonal((1, 0.86, 0.86, 1)))
-# merge the sleeve into the telescope object
-with bpy.context.temp_override(active_object=inner, selected_editable_objects=[inner, sl], object=inner):
-    bpy.ops.object.join()
-
-
-# spreader: not exported. The page uses a slim built spreader like the reference's (the model's is
-# a 2 m tall block); its faces are simply left out.
-
-# cylinder: chassis-pin origin, +Z along the cylinder
-d = (CYL_A - CYL_B)
-CYL_LEN = d.length
-cyl_rot = Vector((0, 0, 1)).rotation_difference(d.normalized()).to_matrix().to_4x4()
-extract('STK_CYL', [3], cyl_rot.inverted() @ Matrix.Translation(-CYL_B), 0.8)
-
-for pid, wx, wz, s in WHEEL_IDS:
-    extract(f'STK_WHEEL_{pid - 10}', [pid], Matrix.Translation(-Vector((wx, 0, wz))), 0.6)
+body = extract('STK_BODY', [0], Matrix.Identity(4), DEC)
+# the AI surface is lumpy: a light volume-keeping smoothing evens the panels without losing the shapes
+sm = body.modifiers.new('sm', 'LAPLACIANSMOOTH'); sm.lambda_factor = 0.35; sm.iterations = 2
+with bpy.context.temp_override(object=body, active_object=body):
+    bpy.ops.object.modifier_apply(modifier='sm')
+# boom, telescope, cylinders, wheels and spreader: not exported, the page builds clean ones
 
 bpy.data.objects.remove(obj)
 
@@ -218,4 +196,4 @@ bpy.ops.export_scene.gltf(filepath=dst, export_format='GLB', export_draco_mesh_c
                           export_draco_mesh_compression_level=7, export_image_format='JPEG', export_jpeg_quality=95,
                           export_apply=True, export_yup=True)
 print('RIG', dict(PIVOT=(PIVOT.x, PIVOT.z), BOOM0=math.degrees(BOOM0), HEAD=(HEAD.x, HEAD.z),
-                  CYL_B=(CYL_B.x, CYL_B.z), CYL_A=(CYL_A.x, CYL_A.z), CYL_LEN=CYL_LEN))
+                  CYL_B=(CYL_B.x, CYL_B.z), CYL_A=(CYL_A.x, CYL_A.z)))
