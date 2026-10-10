@@ -77,14 +77,14 @@ function wheelFaceTexture(kind) {
   const g = c.getContext('2d'), C = S / 2, R = S / 2 - 2;
   const ring = (r, col) => { g.beginPath(); g.arc(C, C, r, 0, Math.PI * 2); g.fillStyle = col; g.fill(); };
   const radial = (r0, r1, stops) => {
-    const gr = g.createRadialGradient(C - R * 0.08, C - R * 0.1, r0, C, C, r1);
+    const gr = g.createRadialGradient(C, C, r0, C, C, r1);   // concentric: the rim reads centred
     stops.forEach(([o, col]) => gr.addColorStop(o, col));
     return gr;
   };
   const holes = (n, rad, w, h, col) => {
     for (let i = 0; i < n; i++) {
       const a = (i + 0.5) * (Math.PI * 2) / n;
-      g.beginPath(); g.ellipse(C + Math.cos(a) * rad, C + Math.sin(a) * rad, w, h, a, 0, Math.PI * 2);
+      g.beginPath(); g.ellipse(C + Math.cos(a) * rad, C + Math.sin(a) * rad, w, h, a + Math.PI / 2, 0, Math.PI * 2);   // long way round the rim
       g.fillStyle = col; g.fill();
     }
   };
@@ -92,7 +92,7 @@ function wheelFaceTexture(kind) {
     for (let i = 0; i < 10; i++) {
       const a = i * Math.PI / 5, x = C + Math.cos(a) * rad, y = C + Math.sin(a) * rad;
       g.beginPath(); g.arc(x, y, size * 1.25, 0, Math.PI * 2); g.fillStyle = '#55595f'; g.fill();
-      g.beginPath(); g.arc(x - size * 0.2, y - size * 0.2, size, 0, Math.PI * 2); g.fillStyle = '#c9ccd0'; g.fill();
+      g.beginPath(); g.arc(x, y, size, 0, Math.PI * 2); g.fillStyle = '#c9ccd0'; g.fill();   // nut centred on its seat
     }
   };
   ring(R, '#18191b');                                  // tyre sidewall
