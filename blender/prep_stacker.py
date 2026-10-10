@@ -112,6 +112,14 @@ part[boom] = 1
 part[spreader] = 4
 INNER_FROM = 7.0                                 # boom-local x where the telescope starts
 part[(part == 1) & (lx >= INNER_FROM)] = 2
+# the page builds its own boom: what the model left round the boom foot (shredded top of the boom
+# towers, the old boom's hoses hanging loose behind it) is dropped; the page adds clean towers + hoses
+is_dark = col.max(1) < 0.3
+part[(part == 0) & (((x < -2.2) & (z > 3.0)) | ((x < -3.55) & (z > 2.45) & is_dark))] = 97
+# the old boom's stub between the towers, and what is left of the model's tyres round the new ones
+part[(part == 0) & ~is_yel & (x > -2.9) & (x < -1.4) & (z > 2.35) & (np.abs(y) < 1.0)] = 97
+for wx, wz in WHEELS:
+    part[(part == 0) & ~is_yel & (np.hypot(x - wx, z - wz) < 0.9) & (np.abs(y) > 0.6)] = 97
 print('FACES', {int(k): int((part == k).sum()) for k in np.unique(part)})
 
 # ---------------------------------------------------------------- livery as the reference's stacker

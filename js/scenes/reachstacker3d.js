@@ -520,6 +520,77 @@ export function buildReachStacker3D({ container: withContainer = true } = {}) {
 }
 
 /**
+ * Off-the-road tyre on a steel rim, like a port machine's: a rounded, bulging carcass (lathe),
+ * chunky chevron lugs across the tread, sidewall ribs, and a deep-set dark rim with hub and nuts.
+ * Axle along local Z, centred on the hub. Built once per size and cloned.
+ */
+const otrCache = new Map();
+function buildOTRWheel(R, W) {
+  const key = `${R}|${W}`;
+  if (otrCache.has(key)) return otrCache.get(key).clone();
+  const g = new THREE.Group();
+  const rubber = new THREE.MeshStandardMaterial({ color: '#1d1e20', roughness: 0.93, metalness: 0 });
+  const rim = new THREE.MeshStandardMaterial({ color: '#33373d', roughness: 0.5, metalness: 0.5 });
+  const hubM = new THREE.MeshStandardMaterial({ color: '#5c626a', roughness: 0.4, metalness: 0.7 });
+  const RIM = R * 0.6, half = W / 2;
+  // carcass: profile (radius, z) from bead to bead with rounded shoulders, lathed round Y → turned to Z
+  const prof = [];
+  const shoulder = (sign) => {
+    const pts = [[RIM, 0.92], [RIM + (R - RIM) * 0.35, 1.0], [R * 0.93, 0.97], [R * 0.985, 0.86], [R, 0.72]];
+    return pts.map(([r, zf]) => new THREE.Vector2(r, sign * zf * half));
+  };
+  prof.push(...shoulder(-1), ...shoulder(1).reverse());
+  const carcass = new THREE.Mesh(new THREE.LatheGeometry(prof, 56).rotateX(Math.PI / 2), rubber);
+  g.add(carcass);
+  // tread lugs: two rows of angled blocks, staggered half a pitch (chevron when seen together)
+  const N = 22, lug = new THREE.BoxGeometry(R * 0.2, R * 0.075, half * 0.78);
+  const lugs = new THREE.InstancedMesh(lug, rubber, N * 2);
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+  for (let i = 0; i < N * 2; i++) {
+    const side = i < N ? 1 : -1, k = i % N;
+    const a = (k + (side > 0 ? 0 : 0.5)) / N * Math.PI * 2;
+    e.set(0, side * 0.42, a + Math.PI / 2, 'ZYX');
+    q.setFromEuler(e);
+    m4.compose(new THREE.Vector3(Math.cos(a) * (R + R * 0.02), Math.sin(a) * (R + R * 0.02), side * half * 0.42), q, new THREE.Vector3(1, 1, 1));
+    lugs.setMatrixAt(i, m4);
+  }
+  g.add(lugs);
+  // sidewall ribs (both faces) for a moulded look
+  [1, -1].forEach((s) => {
+    const rib = new THREE.Mesh(new THREE.TorusGeometry(R * 0.8, R * 0.012, 6, 56), rubber);
+    rib.position.z = s * half * 0.97;
+    g.add(rib);
+  });
+  // rim: lip ring, deep dish, hub with nuts (outer face +Z)
+  const lip = new THREE.Mesh(new THREE.TorusGeometry(RIM, R * 0.035, 10, 48), rim);
+  lip.position.z = half * 0.86;
+  g.add(lip);
+  const dish = new THREE.Mesh(new THREE.CylinderGeometry(RIM * 0.97, RIM * 0.97, W * 0.86, 40, 1, true).rotateX(Math.PI / 2), rim);
+  g.add(dish);
+  const face = new THREE.Mesh(new THREE.CircleGeometry(RIM * 0.97, 40), rim);
+  face.position.z = half * 0.45;                                   // set well in, like a deep steel rim
+  g.add(face);
+  for (let i = 0; i < 8; i++) {                                    // hand holes
+    const a = (i + 0.5) / 8 * Math.PI * 2;
+    const hole = new THREE.Mesh(new THREE.CircleGeometry(RIM * 0.11, 16), new THREE.MeshBasicMaterial({ color: '#0b0c0d' }));
+    hole.position.set(Math.cos(a) * RIM * 0.62, Math.sin(a) * RIM * 0.62, half * 0.451);
+    g.add(hole);
+  }
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(RIM * 0.36, RIM * 0.42, W * 0.22, 24).rotateX(Math.PI / 2), hubM);
+  hub.position.z = half * 0.55;
+  g.add(hub);
+  for (let i = 0; i < 10; i++) {
+    const a = i / 10 * Math.PI * 2;
+    const nut = new THREE.Mesh(new THREE.CylinderGeometry(RIM * 0.045, RIM * 0.045, W * 0.08, 6).rotateX(Math.PI / 2), hubM);
+    nut.position.set(Math.cos(a) * RIM * 0.27, Math.sin(a) * RIM * 0.27, half * 0.68);
+    g.add(nut);
+  }
+  g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  otrCache.set(key, g);
+  return g.clone();
+}
+
+/**
  * Swaps the built stacker for the textured model (Meshy "Reach Stacker" by oguz.backovski, CC0;
  * cut into parts by blender/prep_stacker.py). The model's own joints replace the kinematic
  * constants; the tip contract (solve/apply, SP_H) stays, so every pose keeps working.
@@ -577,13 +648,40 @@ export function upgradeStacker(rig) {
     G.PIVOT.set(-3.2, 3.35);
     parts.boom.position.set(G.PIVOT.x, G.PIVOT.y, 0);
     parts.root.add(get('STK_BODY'));
+    // boom foot: the model's towers were shredded there; clean twin plates up to the pin, and the
+    // pin itself (static), plus the hydraulic hoses running round the heel (they ride the boom)
+    const charcoal = new THREE.MeshStandardMaterial({ color: '#2b2e33', roughness: 0.5, metalness: 0.4 });
+    const pinM = new THREE.MeshStandardMaterial({ color: '#8d96a2', roughness: 0.3, metalness: 0.9 });
+    [-1, 1].forEach((s) => {
+      const shp = new THREE.Shape();
+      shp.moveTo(-4.15, 2.3); shp.lineTo(-2.35, 2.3); shp.lineTo(-2.85, G.PIVOT.y + 0.1);
+      shp.absarc(G.PIVOT.x, G.PIVOT.y, 0.42, 0, Math.PI, false); shp.lineTo(-3.75, 2.9); shp.lineTo(-4.15, 2.3);
+      const plate = new THREE.Mesh(new THREE.ExtrudeGeometry(shp, { depth: 0.12, bevelEnabled: true, bevelSize: 0.02, bevelThickness: 0.02, bevelSegments: 2 }), charcoal);
+      plate.position.z = s * 0.62 - 0.06;
+      plate.castShadow = true;
+      parts.root.add(plate);
+    });
+    const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 1.62, 24).rotateX(Math.PI / 2), pinM);
+    pin.position.set(G.PIVOT.x, G.PIVOT.y, 0);
+    parts.root.add(pin);
+    const hoseM = new THREE.MeshStandardMaterial({ color: '#111214', roughness: 0.7 });
+    [-0.28, -0.12, 0.12, 0.28].forEach((z, i) => {
+      // boom-local: from the top of the boom over the heel, round behind the pin, down into the body
+      const c = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(1.6, 0.52, z), new THREE.Vector3(0.0, 0.62, z), new THREE.Vector3(-0.85, 0.35, z),
+        new THREE.Vector3(-1.0, -0.35 - i * 0.04, z * 1.3), new THREE.Vector3(-0.7, -0.95, z * 1.5),
+      ]);
+      const hose = new THREE.Mesh(new THREE.TubeGeometry(c, 40, 0.045, 8), hoseM);
+      hose.castShadow = true;
+      parts.boom.add(hose);
+    });
     // wheels: the model's tyres are lumpy and were cut out of the body with bits of mudguard (they
     // wobbled when turning): clean round ones instead, like the reference's, black tyres on dark
     // rims, twin at the front (the model's tyres span |z| 0.64–1.91 there), single at the rear
     const R_W = 0.75;
     const wheels = [];
     [[2.6, 0.95, 0.6], [2.6, 1.6, 0.6], [-3.4, 1.42, 0.86]].forEach(([x, z, w]) => [1, -1].forEach((s) => {
-      const wh = buildWheel(R_W, w, '#4a4f57');
+      const wh = buildOTRWheel(R_W, w);
       const g = new THREE.Group();
       g.position.set(x, R_W, s * z);
       if (s < 0) wh.rotation.y = Math.PI;
