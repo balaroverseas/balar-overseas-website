@@ -582,17 +582,20 @@ export function upgradeStacker(rig) {
     cyl.add(get('STK_CYL'));
     parts.root.add(cyl);
     G.model = { cyl, len: 4.1814 };
-    const hubs = [[2.6, 0.72], [2.6, 0.72], [-3.4, 0.72], [-3.4, 0.72]];
+    // wheels: the model's tyres are lumpy and were cut out of the body with bits of mudguard (they
+    // wobbled when turning): clean round ones instead, like the reference's, black tyres on dark
+    // rims, twin at the front (the model's tyres span |z| 0.64–1.91 there), single at the rear
+    const R_W = 0.75;
     const wheels = [];
-    hubs.forEach(([x, y], k) => {
-      const w = get(`STK_WHEEL_${k}`);
-      if (!w) return;
+    [[2.6, 0.95, 0.6], [2.6, 1.6, 0.6], [-3.4, 1.42, 0.86]].forEach(([x, z, w]) => [1, -1].forEach((s) => {
+      const wh = buildWheel(R_W, w, '#4a4f57');
       const g = new THREE.Group();
-      g.position.set(x, y, 0);
-      g.add(w);
+      g.position.set(x, R_W, s * z);
+      if (s < 0) wh.rotation.y = Math.PI;
+      g.add(wh);
       parts.root.add(g);
       wheels.push(g);
-    });
+    }));
     parts.wheels.splice(0, parts.wheels.length, ...wheels);
     return rig;
   }).catch((e) => { console.warn('[3D] stacker model not loaded, keeping the built one', e); return rig; });
