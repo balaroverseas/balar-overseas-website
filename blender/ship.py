@@ -70,7 +70,8 @@ def sea_mat():
     m.use_nodes = True
     nt = m.node_tree
     b = nt.nodes['Principled BSDF']
-    b.inputs['Roughness'].default_value = 0.3     # dull enough that the sun never glares
+    b.inputs['Roughness'].default_value = 0.22
+    b.inputs['Specular IOR Level'].default_value = 0.22   # some sky glint on the wave faces (reference), not a lilac wash
     tc = nt.nodes.new('ShaderNodeTexCoord')
     mp = nt.nodes.new('ShaderNodeMapping')
     mp.name = 'sea_map'
@@ -85,19 +86,19 @@ def sea_mat():
     streak.inputs[1].default_value = (1.0, 0.28, 1.0)
     nt.links.new(mp.outputs['Vector'], streak.inputs[0])
     nt.links.new(streak.outputs['Vector'], caps.inputs['Vector'])
-    b1 = node(nt, 'ShaderNodeBump', Strength=0.35, Distance=1.0)
-    b2 = node(nt, 'ShaderNodeBump', Strength=0.25, Distance=0.25)
+    b1 = node(nt, 'ShaderNodeBump', Strength=0.45, Distance=1.0)
+    b2 = node(nt, 'ShaderNodeBump', Strength=0.38, Distance=0.25)
     nt.links.new(swell.outputs['Fac'], b1.inputs['Height'])
     nt.links.new(chop.outputs['Fac'], b2.inputs['Height'])
     nt.links.new(b1.outputs['Normal'], b2.inputs['Normal'])
     nt.links.new(b2.outputs['Normal'], b.inputs['Normal'])
     deep = nt.nodes.new('ShaderNodeValToRGB')
-    deep.color_ramp.elements[0].color = (*srgb('#03113f'), 1)
-    deep.color_ramp.elements[1].color = (*srgb('#0a2a78'), 1)
+    deep.color_ramp.elements[0].color = (*srgb('#021257'), 1)       # reference: deep saturated navy
+    deep.color_ramp.elements[1].color = (*srgb('#0a2a96'), 1)
     nt.links.new(swell.outputs['Fac'], deep.inputs['Fac'])
     cap = nt.nodes.new('ShaderNodeValToRGB')
-    cap.color_ramp.elements[0].position = 0.61
-    cap.color_ramp.elements[1].position = 0.67
+    cap.color_ramp.elements[0].position = 0.68                      # fewer, finer whitecaps
+    cap.color_ramp.elements[1].position = 0.72
     nt.links.new(caps.outputs['Fac'], cap.inputs['Fac'])
     mix = nt.nodes.new('ShaderNodeMix')
     mix.data_type = 'RGBA'
@@ -157,9 +158,9 @@ def foam_mat(name, along='Y', length=150.0, scale=0.25, strength=1.0):
 DECK = 3.0
 HALF = 8.0                                 # 5 container columns, like the reference
 ship = empty('ship')
-hull_m = mat('hull', '#1b2436', metal=0.3, rough=0.45, coat=0.4)
-rim_m = mat('rim', '#2c3f5e', metal=0.3, rough=0.5)
-deck_m = mat('deck', '#3d5675', metal=0.2, rough=0.6)
+hull_m = mat('hull', '#1f3f68', metal=0.3, rough=0.45, coat=0.4)     # reference: steel-blue ship
+rim_m = mat('rim', '#2d5682', metal=0.3, rough=0.5)
+deck_m = mat('deck', '#3a6898', metal=0.2, rough=0.6)
 fore_m = mat('foredeck', '#3f6b5c', metal=0.1, rough=0.7)
 white = mat('super_white', '#eef0f2', rough=0.35, coat=0.6)
 dark = mat('ship_dark', '#1c2026', metal=0.4, rough=0.5)
@@ -168,15 +169,17 @@ indigo = mat('funnel_indigo', '#3b2cff', metal=0.2, rough=0.3, coat=1.0)
 orange = mat('funnel_orange', '#ff8a3d', rough=0.35, coat=0.8)
 yellow = mat('rail_yellow', '#f2c230', rough=0.4)
 red = mat('winch_red', '#b8322b', rough=0.4, coat=0.5)
-grey = mat('bridge_grey', '#8d99a8', metal=0.5, rough=0.4)
+grey = mat('bridge_grey', '#4f6c90', metal=0.5, rough=0.4)          # lashing bridges: blue-grey steel like the deck
 
-side = [(5.4, -58), (7.6, -56.5), (HALF, -52), (HALF, 30), (7.75, 37), (6.75, 44), (5.0, 50), (2.7, 55), (0, 58)]
+# as the reference: bow DOWN on screen (pointed end at -Y), accommodation and wake at the top (stern)
+side = [(5.4, 58), (7.6, 56.5), (HALF, 52), (HALF, -30), (7.75, -37), (6.75, -44), (5.0, -50), (2.7, -55), (0, -58)]
 outline = side + [(-x, y) for x, y in reversed(side[:-1])]
+outline.reverse()                                   # keep the winding the prism expects
 prism('hull', outline, -4, DECK, hull_m, bevel=0.4, parent=ship)
 inner = [(x * 0.93 if x else 0, y * 0.985) for x, y in outline]
 prism('deck', inner, DECK - 0.4, DECK + 0.05, deck_m, bevel=0.1, parent=ship)
-prism('bulwark_fore', [(x, y) for x, y in outline if y > 40] + [(-5.0, 40), (5.0, 40)], DECK, DECK + 1.2, rim_m, bevel=0.1, parent=ship)
-prism('foredeck', [(x * 0.9, y) for x, y in outline if y > 41] + [(-4.7, 41), (4.7, 41)], DECK + 1.2, DECK + 1.3, fore_m, bevel=0.05, parent=ship)
+prism('bulwark_fore', [(5.0, -40), (-5.0, -40)] + [(x, y) for x, y in outline if y < -40], DECK, DECK + 1.2, rim_m, bevel=0.1, parent=ship)
+prism('foredeck', [(4.7, -41), (-4.7, -41)] + [(x * 0.9, y) for x, y in outline if y < -41], DECK + 1.2, DECK + 1.3, fore_m, bevel=0.05, parent=ship)
 
 # container bays: 6 bays x 6 columns of 40ft boxes with lashing bridges between
 # saturated like the reference (blues, magenta/pink, violet, red, orange, the odd white/green)
@@ -247,7 +250,7 @@ def top_box(name, x, yc, z0, m_):
     return o
 
 
-y = -50.0                                  # bays from the stern up to the forward bridge
+y = -38.0                                  # bays from behind the forecastle up to the accommodation
 for bay in range(6):
     yc = y + BAY_LEN / 2
     tiers_base = rnd.choice((3, 4, 4, 5))
@@ -276,43 +279,39 @@ for bay in range(6):
 
 # bow: breakwater, winches, bollards, foremast
 for sgn in (-1, 1):
-    bw = box(f'breakwater{sgn}', (5.4, 0.35, 2.2), (sgn * 2.1, 44.6, DECK + 1.6), rim_m, bevel=0.04, parent=ship)
-    bw.rotation_euler = (0, 0, sgn * 0.42)
-    for i, yy in enumerate((45.5, 49.5)):
+    bw = box(f'breakwater{sgn}', (5.4, 0.35, 2.2), (sgn * 2.1, -44.6, DECK + 1.6), rim_m, bevel=0.04, parent=ship)
+    bw.rotation_euler = (0, 0, -sgn * 0.42)
+    for i, yy in enumerate((-45.5, -49.5)):
         cylinder(f'winch{sgn}{i}', 0.9, 1.6, (sgn * 3.2, yy, DECK + 2.0), red, axis='X', parent=ship)
-    for yy in (44, 47.5, 51):
-        cylinder(f'bollard{sgn}{yy}', 0.28, 0.7, (sgn * 5.2 * (1 - (yy - 44) / 30), yy, DECK + 1.6), dark, axis='Z', parent=ship)
-cylinder('foremast', 0.25, 8, (0, 53.5, DECK + 5), white, axis='Z', parent=ship)
-box('foremast_x', (2.4, 0.2, 0.2), (0, 53.5, DECK + 8.0), white, parent=ship)
+    for yy in (-44, -47.5, -51):
+        cylinder(f'bollard{sgn}{yy}', 0.28, 0.7, (sgn * 5.2 * (1 - (-yy - 44) / 30), yy, DECK + 1.6), dark, axis='Z', parent=ship)
+cylinder('foremast', 0.25, 8, (0, -53.5, DECK + 5), white, axis='Z', parent=ship)
+box('foremast_x', (2.4, 0.2, 0.2), (0, -53.5, DECK + 8.0), white, parent=ship)
 
-# reference ship: accommodation + bridge FORWARD (behind the forecastle), funnel/engine casing aft
-box('accom', (12.5, 7, 16), (0, 37.5, DECK + 8), white, bevel=0.2, parent=ship)
-box('bridge_deck', (2 * HALF + 0.6, 4.0, 2.4), (0, 39.0, DECK + 16.6), white, bevel=0.15, parent=ship)
-box('bridge_windows', (2 * HALF + 0.65, 0.1, 1.1), (0, 41.05, DECK + 16.7), window, bevel=0.02, parent=ship)
-box('bridge_roof', (14, 5.5, 0.3), (0, 38.2, DECK + 18), white, bevel=0.08, parent=ship)
-box('radar_mast', (1.2, 1.2, 5), (0, 37.5, DECK + 20.5), white, bevel=0.05, parent=ship)
+# reference ship: white accommodation + bridge at the stern (top of the screen), funnel right behind
+box('accom', (12.5, 7, 16), (0, 49.5, DECK + 8), white, bevel=0.2, parent=ship)
+box('bridge_deck', (2 * HALF + 0.6, 4.0, 2.4), (0, 48.0, DECK + 16.6), white, bevel=0.15, parent=ship)
+box('bridge_windows', (2 * HALF + 0.65, 0.1, 1.1), (0, 45.95, DECK + 16.7), window, bevel=0.02, parent=ship)
+box('bridge_roof', (14, 5.5, 0.3), (0, 48.8, DECK + 18), white, bevel=0.08, parent=ship)
+box('radar_mast', (1.2, 1.2, 5), (0, 49.5, DECK + 20.5), white, bevel=0.05, parent=ship)
 for i, xx in enumerate((-2.2, 2.2)):
-    box(f'radar{i}', (3.4, 0.25, 0.2), (xx, 37.5 + i * 1.5, DECK + 22.8 - i * 1.5), dark, parent=ship)
-box('engine_casing', (10, 6, 9), (0, -53.0, DECK + 4.5), white, bevel=0.2, parent=ship)
-box('funnel', (4.4, 4.8, 14), (0, -53.0, DECK + 7), indigo, bevel=0.5, parent=ship)
-box('funnel_band', (4.45, 4.85, 1.2), (0, -53.0, DECK + 12.0), orange, bevel=0.5, parent=ship)
-box('funnel_top', (4.0, 4.4, 0.5), (0, -53.0, DECK + 14.1), dark, bevel=0.3, parent=ship)
-for i, xx in enumerate((-0.9, 0.9)):
-    cylinder(f'exhaust{i}', 0.55, 1.5, (xx, -51.5, DECK + 26.6), dark, axis='Z', parent=ship)
-lib.text('funnel_logo', 'BALAR', 1.1, (-1.95, -55.42, DECK + 9.0), white, parent=ship)
+    box(f'radar{i}', (3.4, 0.25, 0.2), (xx, 49.5 - i * 1.5, DECK + 22.8 - i * 1.5), dark, parent=ship)
+box('funnel', (3.6, 3.8, 12), (0, 54.6, DECK + 8), white, bevel=0.5, parent=ship)
+box('funnel_band', (3.65, 3.85, 1.0), (0, 54.6, DECK + 12.6), indigo, bevel=0.5, parent=ship)
+box('funnel_top', (3.2, 3.4, 0.5), (0, 54.6, DECK + 14.1), dark, bevel=0.3, parent=ship)
 for sgn in (-1, 1):                       # lifeboats on davits
-    box(f'lifeboat{sgn}', (1.8, 6.5, 1.6), (sgn * 6.7, 36.0, DECK + 7), orange, bevel=0.7, parent=ship)
-box('stern_deck', (11, 3, 0.3), (0, -56.5, DECK + 0.2), deck_m, bevel=0.05, parent=ship)
+    box(f'lifeboat{sgn}', (1.8, 6.5, 1.6), (sgn * 6.7, 50.5, DECK + 7), orange, bevel=0.7, parent=ship)
+box('stern_deck', (11, 3, 0.3), (0, 56.5, DECK + 0.2), deck_m, bevel=0.05, parent=ship)
 for sgn in (-1, 1):
-    cylinder(f'stern_winch{sgn}', 0.8, 1.4, (sgn * 3.5, -56.8, DECK + 1.1), red, axis='X', parent=ship)
+    cylinder(f'stern_winch{sgn}', 0.8, 1.4, (sgn * 3.5, 56.8, DECK + 1.1), red, axis='X', parent=ship)
 
 # ----------------------------------------------------------------------------- sea, wake, clouds
 sea = sea_mat()
 water = plane('sea', 3000, 3000, (0, 0, 0), sea)
-wake_m = foam_mat('wake', length=200, scale=0.3, strength=0.55)
+wake_m = foam_mat('wake', length=-200, scale=0.3, strength=0.55)     # trails behind the stern, up the screen
 me = bpy.data.meshes.new('wake')
 bm = bmesh.new()
-pts = [(-6.5, -57), (6.5, -57), (40, -320), (-40, -320)]
+pts = [(-40, 320), (40, 320), (6.5, 57), (-6.5, 57)]
 bm.faces.new([bm.verts.new((x, yy, 0.06)) for x, yy in pts])
 bm.to_mesh(me)
 bm.free()
@@ -325,14 +324,16 @@ for sgn in (-1, 1):
     bme = bpy.data.meshes.new(f'bowwave{sgn}')
     bm = bmesh.new()
     # local origin at the bow so the foam fades out towards the stern
-    quad = [(sgn * 3.2, 0), (sgn * 9.6, -16), (sgn * 15.0, -86), (sgn * 9.2, -26)]
+    quad = [(sgn * 3.2, 0), (sgn * 8.0, 10), (sgn * 11.0, 40), (sgn * 7.5, 16)]   # short bow waves: the bays near the stern stay clear
+    if sgn > 0:
+        quad.reverse()
     bm.faces.new([bm.verts.new((x, yy, 0.07)) for x, yy in quad])
     bm.to_mesh(bme)
     bm.free()
     bw = bpy.data.objects.new(f'bowwave{sgn}', bme)
     s.collection.objects.link(bw)
-    bw.data.materials.append(foam_mat(f'bowfoam{sgn}', length=90, scale=0.5))
-    bw.location = (0, 56, 0)
+    bw.data.materials.append(foam_mat(f'bowfoam{sgn}', length=-40, scale=0.5, strength=0.7))
+    bw.location = (0, -56, 0)
 # The reference looks straight down with almost no perspective (only container roofs, no sides):
 # camera heights and lens are both VERT× the measured framing, so the footprint stays the same
 VERT = 3.0
@@ -340,7 +341,12 @@ clouds = []
 for i, z in enumerate((300 * VERT, 380 * VERT, 470 * VERT)):
     clouds.append(plane(f'cloud{i}', 2600, 2600, (0, 0, z), cloud_mat(f'cloud{i}', i + 1)))
 
-lib.studio_light(sun_dir=(-30, 0, -20), strength=1.05, sky_strength=0.08)   # angled sun: no glint patch under the camera (reference shows none)
+sun_o = lib.studio_light(sun_dir=(-11, 0, -20), strength=1.05, sky_strength=0.06)   # angled: no glint under the camera
+sun_o.data.angle = math.radians(9)                   # large soft sun: the ship's shadow on the water stays faint
+# the reference shows no shadow or mirror image of the ship on the water (a pale band beside the hull)
+for o in [ship] + list(ship.children_recursive):
+    o.visible_glossy = False
+    o.visible_shadow = False
 
 # ----------------------------------------------------------------------------- camera
 cam_data = bpy.data.cameras.new('cam')
@@ -377,15 +383,15 @@ def apply(f):
     z = cam_z(f) * VERT
     # glide over the bays towards the bow (reference 0–0.36: still only bays, the bridge first
     # shows at the top edge around 0.6), then re-centre on the whole ship (by 0.66)
-    yy = lerp(-30, 10, seg(f, 1, 75))
-    yy = lerp(yy, 4, seg(f, 75, 136))
+    yy = lerp(-16, 32, seg(f, 1, 75))           # start over the bays only (bow out of shot), glide to the stern accommodation
+    yy = lerp(yy, 6, seg(f, 75, 136))
     # the road it continues sits a touch right of centre on the page: start under it, settle centred
     cam.location = (-0.15 * (1 - seg(f, 1, 40)), yy, z)       # centre column under the truck (635px)
-    sea_map.inputs['Location'].default_value = (0, -t * 90, 0)   # water streams past: ship under way
+    sea_map.inputs['Location'].default_value = (0, t * 90, 0)    # water streams past (up): ship sails down the screen
     for fm in foam_maps:
-        fm.inputs['Location'].default_value = (0, -t * 90, 0)
+        fm.inputs['Location'].default_value = (0, t * 90, 0)
     for c in clouds:                           # clouds hang still while the ship sails on
-        c.location.y = -t * 90
+        c.location.y = t * 90
 
 
 for f in range(1, LAST + 1):
