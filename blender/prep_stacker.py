@@ -6,11 +6,12 @@ points +X, cut into the parts the page animates and decimated:
   STK_BODY      chassis, cab, counterweight (static)
   STK_BOOM      outer boom, local frame: origin = foot pin, +X along the boom
   STK_INNER     telescope + head, same frame (slides along +X); a slimmer sleeve hides the gap
-  STK_SPREADER  origin = head pin, hangs level; arms stretched to a 40 ft box
+  STK_SPREADER  origin = head pin, hangs level
   STK_CYL       lift cylinder, origin = chassis pin, +Z along the cylinder, rest length CYL_LEN
   STK_WHEEL_n   tyres, origin = hub (spin about local Y)
 
-The brand lettering is painted out of the texture (white on red -> red, dark on yellow -> yellow).
+The model keeps its look exactly as downloaded: textures, colours and materials are untouched;
+only the mesh is cut into parts and evenly simplified.
 
   blender -b --factory-startup -P prep_stacker.py -- <source.glb> <out.glb>
 """
@@ -40,7 +41,7 @@ S = 6.0 / (REAR_SRC - FRONT_SRC)
 me.transform(Matrix.Translation((2.6 + FRONT_SRC * S, 0, -zmin * S)) @ Matrix.Diagonal((S, S, S, 1)) @ Matrix.Rotation(math.pi, 4, 'Z'))
 
 # a first, even pass of decimation keeps the per-face work below manageable (2M -> ~300k faces)
-mod0 = obj.modifiers.new('dec0', 'DECIMATE'); mod0.ratio = 0.15
+mod0 = obj.modifiers.new('dec0', 'DECIMATE'); mod0.ratio = 0.3
 with bpy.context.temp_override(object=obj, active_object=obj):
     bpy.ops.object.modifier_apply(modifier='dec0')
 print('DECIMATED', len(me.polygons))
@@ -54,7 +55,7 @@ CYL_A = Vector((-0.78, 0, 4.70))               # cylinder boom pin
 WHEELS = [(2.6, 0.72), (-3.4, 0.72)]           # (x, hub height)
 WHEEL_R = 0.74
 
-# ---------------------------------------------------------------- texture: paint the lettering out
+# ---------------------------------------------------------------- texture (read only: used to tell red boom faces apart)
 img = next(i for i in bpy.data.images if i.name.startswith('base_color'))
 W, H = img.size
 px = np.array(img.pixels[:], dtype=np.float32).reshape(H, W, 4)
@@ -66,24 +67,6 @@ def box_mean(a, r):
     return (c[2 * r + 1:, 2 * r + 1:] - c[:-2 * r - 1, 2 * r + 1:] - c[2 * r + 1:, :-2 * r - 1] + c[:-2 * r - 1, :-2 * r - 1]) / (2 * r + 1) ** 2
 
 
-r_, g_, b_ = rgb[..., 0], rgb[..., 1], rgb[..., 2]
-red = ((r_ > 0.45) & (g_ < 0.3) & (b_ < 0.3) & (r_ > 2.2 * g_)).astype(np.float32)   # texture values are sRGB
-yel = ((r_ > 0.6) & (g_ > 0.45) & (b_ < 0.35)).astype(np.float32)
-red_n, yel_n = box_mean(red, 40), box_mean(yel, 40)   # letters are big: judge by a wide neighbourhood
-white = (r_ > 0.62) & (g_ > 0.6) & (b_ > 0.55)
-dark = (r_ < 0.3) & (g_ < 0.3) & (b_ < 0.3)
-fix_red = white & (red_n > 0.3)
-fix_yel = dark & (yel_n > 0.45)
-# fill with the local average of the surrounding paint
-for mask, base in ((fix_red, red), (fix_yel, yel)):
-    w = box_mean(base, 24) + 1e-6
-    for ch in range(3):
-        avg = box_mean(rgb[..., ch] * base, 24) / w
-        rgb[..., ch] = np.where(mask, avg, rgb[..., ch])
-px[..., :3] = rgb
-img.pixels[:] = px.ravel()
-img.update()
-print('LETTERING px painted:', int(fix_red.sum()), int(fix_yel.sum()))
 
 # ---------------------------------------------------------------- classify faces
 src_mat = me.materials[0]
@@ -161,13 +144,14 @@ def frame(origin, angle=0.0):
     return Matrix.Rotation(angle, 4, 'Y') @ Matrix.Translation(-origin)
 
 
-DEC = 0.5
+DEC = 0.6
 extract('STK_BODY', [0], Matrix.Identity(4), DEC)
 boom_frame = frame(PIVOT, BOOM0)              # rotating by +angle about Y maps the boom axis onto +X
 extract('STK_BOOM', [1], boom_frame, DEC)
 inner = extract('STK_INNER', [2], boom_frame, DEC)
 # sleeve: a slimmer copy of the outer section just behind the telescope, hidden inside the boom
-sleeve_ids = np.nonzero((part == 1) & (lx > INNER_FROM - 3.0) & (lx < INNER_FROM))[0]
+# the journey runs the telescope out up to 4.9 m: the sleeve covers 5.3 m
+sleeve_ids = np.nonzero((part == 1) & (lx > INNER_FROM - 5.3) & (lx < INNER_FROM))[0]
 part_bak = part.copy()
 part[sleeve_ids] = 99
 sl = extract('STK_SLEEVE', [99], boom_frame, DEC)
@@ -178,15 +162,8 @@ with bpy.context.temp_override(active_object=inner, selected_editable_objects=[i
     bpy.ops.object.join()
 
 
-# spreader: head-pin origin; stretch the arms so the twistlocks sit on a 40 ft box
-sp = extract('STK_SPREADER', [4], frame(HEAD), DEC)
-A0, A1, GROW = 1.0, 3.3, (12.192 - 7.57) / 2
-for v in sp.data.vertices:
-    a = abs(v.co.y)
-    if a > A1:
-        v.co.y += math.copysign(GROW, v.co.y)
-    elif a > A0:
-        v.co.y = math.copysign(A0 + (a - A0) * (A1 + GROW - A0) / (A1 - A0), v.co.y)
+# spreader: head-pin origin, as modelled
+extract('STK_SPREADER', [4], frame(HEAD), DEC)
 
 # cylinder: chassis-pin origin, +Z along the cylinder
 d = (CYL_A - CYL_B)
@@ -199,21 +176,9 @@ for pid, wx, wz, s in WHEEL_IDS:
 
 bpy.data.objects.remove(obj)
 
-# textures: smaller for the web; drop the emissive map
-for i in bpy.data.images:
-    if i.size[0] > 1024:
-        i.scale(1024, 1024)
-for m in bpy.data.materials:
-    if m.use_nodes:
-        b = m.node_tree.nodes.get('Principled BSDF')
-        if b:
-            for lk in list(b.inputs['Emission Color'].links):
-                m.node_tree.links.remove(lk)
-            b.inputs['Emission Color'].default_value = (0, 0, 0, 1)   # unlinked socket defaults to white: no glow
-            b.inputs['Emission Strength'].default_value = 0.0
 
 bpy.ops.export_scene.gltf(filepath=dst, export_format='GLB', export_draco_mesh_compression_enable=True,
-                          export_draco_mesh_compression_level=7, export_image_format='JPEG', export_jpeg_quality=82,
+                          export_draco_mesh_compression_level=7, export_image_format='JPEG', export_jpeg_quality=95,
                           export_apply=True, export_yup=True)
 print('RIG', dict(PIVOT=(PIVOT.x, PIVOT.z), BOOM0=math.degrees(BOOM0), HEAD=(HEAD.x, HEAD.z),
                   CYL_B=(CYL_B.x, CYL_B.z), CYL_A=(CYL_A.x, CYL_A.z), CYL_LEN=CYL_LEN))

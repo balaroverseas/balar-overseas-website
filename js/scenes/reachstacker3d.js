@@ -531,7 +531,9 @@ export function upgradeStacker(rig) {
       const o = src.getObjectByName(n);
       if (!o) return null;
       const c = o.clone(true);
-      c.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
+      // the model's paint is fully metallic (its metal/rough map): under the page's bright white
+      // environment the navy read lilac; a dim reflection keeps the colours as Meshy shows them
+      c.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; m.material.envMapIntensity = 0.35; } });
       return c;
     };
     // hide the built meshes (the telescope group itself is a child of the boom: it stays)
