@@ -51,6 +51,7 @@ export function upgradeTruck(truck) {
     truck.children.slice().forEach((c) => { if (!c.userData.keep) truck.remove(c); });
     truck.add(model);
     addWheelFaces(model, wheels);
+    addSideBoxes(truck);
     const R = 0.52;
     // at road speed a wheel turns ~110° between frames, which the eye reads as standing still or
     // running backwards (wagon-wheel effect): cap the visible turn per frame so the rotation reads
@@ -123,6 +124,41 @@ function wheelFaceTexture(kind) {
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 4;
   return (wheelFaceTex[kind] = t);
+}
+
+// The reference tractor has a brushed-aluminium box (tank / battery box) on each side just behind
+// the steer wheel, under the cab: ~0.6 m long, its lower front corner chamfered, a crease across it.
+// Measured off its side view against the 3.6 m wheelbase; truck-local metres (front axle x 7.29).
+function addSideBoxes(truck) {
+  const x0 = 5.95, x1 = 6.58, y0 = 0.34, y1 = 1.0, ch = 0.16, depth = 0.42;
+  const sh = new THREE.Shape();
+  sh.moveTo(x0, y0); sh.lineTo(x1 - ch, y0); sh.lineTo(x1, y0 + ch); sh.lineTo(x1, y1); sh.lineTo(x0, y1); sh.lineTo(x0, y0);
+  const geo = new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: true, bevelThickness: 0.015, bevelSize: 0.015, bevelSegments: 2 });
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 64;
+  const g = c.getContext('2d');
+  g.fillStyle = '#c3c6ca'; g.fillRect(0, 0, 256, 64);
+  for (let i = 0; i < 256; i += 2) {                   // brushed grain
+    g.fillStyle = `rgba(${i % 6 ? 255 : 0},${i % 6 ? 255 : 0},${i % 6 ? 255 : 0},${0.03 + 0.03 * Math.random()})`;
+    g.fillRect(i, 0, 1, 64);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  const mat = new THREE.MeshStandardMaterial({ map: tex, color: '#b9bcc0', metalness: 0.55, roughness: 0.35, envMapIntensity: 0.8 });
+  const crease = new THREE.MeshStandardMaterial({ color: '#6c7076', metalness: 0.4, roughness: 0.5 });
+  [1, -1].forEach((s) => {
+    const box = new THREE.Mesh(geo, mat);
+    // the extrusion runs +z: outer face at |z| 1.31 on either side
+    box.position.z = s > 0 ? 1.31 - depth : -1.31;
+    box.castShadow = true;
+    box.userData.keep = true;
+    truck.add(box);
+    const line = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0 - 0.06, 0.018, 0.01), crease);
+    line.position.set((x0 + x1) / 2 - 0.02, y0 + (y1 - y0) * 0.64, s * (1.31 + 0.017));
+    line.userData.keep = true;
+    truck.add(line);
+  });
 }
 
 function addWheelFaces(model, wheels) {
