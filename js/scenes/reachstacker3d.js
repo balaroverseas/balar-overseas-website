@@ -530,7 +530,7 @@ function buildOTRWheel(R, W) {
   if (otrCache.has(key)) return otrCache.get(key).clone();
   const g = new THREE.Group();
   const rubber = new THREE.MeshStandardMaterial({ color: '#1d1e20', roughness: 0.93, metalness: 0 });
-  const rim = new THREE.MeshStandardMaterial({ color: '#1d2023', roughness: 0.55, metalness: 0.4 });
+  const rim = new THREE.MeshStandardMaterial({ color: '#2c3035', roughness: 0.55, metalness: 0.4 });   // dark, but light enough for the hand holes to read
   const hubM = new THREE.MeshStandardMaterial({ color: '#3b4046', roughness: 0.45, metalness: 0.6 });
   const RIM = R * 0.6, half = W / 2;
   // carcass: profile (radius, z) from bead to bead with rounded shoulders, lathed round Y → turned to Z
@@ -568,21 +568,21 @@ function buildOTRWheel(R, W) {
   const dish = new THREE.Mesh(new THREE.CylinderGeometry(RIM * 0.97, RIM * 0.97, W * 0.86, 40, 1, true).rotateX(Math.PI / 2), rim);
   g.add(dish);
   const face = new THREE.Mesh(new THREE.CircleGeometry(RIM * 0.97, 40), rim);
-  face.position.z = half * 0.45;                                   // set well in, like a deep steel rim
+  face.position.z = half - 0.14;                                   // same depth on every wheel (wide rear ones were set so deep they sat in shadow)
   g.add(face);
   for (let i = 0; i < 8; i++) {                                    // hand holes
     const a = (i + 0.5) / 8 * Math.PI * 2;
     const hole = new THREE.Mesh(new THREE.CircleGeometry(RIM * 0.11, 16), new THREE.MeshBasicMaterial({ color: '#0b0c0d' }));
-    hole.position.set(Math.cos(a) * RIM * 0.62, Math.sin(a) * RIM * 0.62, half * 0.451);
+    hole.position.set(Math.cos(a) * RIM * 0.62, Math.sin(a) * RIM * 0.62, half - 0.139);
     g.add(hole);
   }
   const hub = new THREE.Mesh(new THREE.CylinderGeometry(RIM * 0.36, RIM * 0.42, W * 0.22, 24).rotateX(Math.PI / 2), hubM);
-  hub.position.z = half * 0.55;
+  hub.position.z = half - 0.1;
   g.add(hub);
   for (let i = 0; i < 10; i++) {
     const a = i / 10 * Math.PI * 2;
     const nut = new THREE.Mesh(new THREE.CylinderGeometry(RIM * 0.045, RIM * 0.045, W * 0.08, 6).rotateX(Math.PI / 2), hubM);
-    nut.position.set(Math.cos(a) * RIM * 0.27, Math.sin(a) * RIM * 0.27, half * 0.68);
+    nut.position.set(Math.cos(a) * RIM * 0.27, Math.sin(a) * RIM * 0.27, half - 0.05);
     g.add(nut);
   }
   g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
