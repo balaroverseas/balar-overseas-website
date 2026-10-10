@@ -530,8 +530,8 @@ function buildOTRWheel(R, W) {
   if (otrCache.has(key)) return otrCache.get(key).clone();
   const g = new THREE.Group();
   const rubber = new THREE.MeshStandardMaterial({ color: '#1d1e20', roughness: 0.93, metalness: 0 });
-  const rim = new THREE.MeshStandardMaterial({ color: '#33373d', roughness: 0.5, metalness: 0.5 });
-  const hubM = new THREE.MeshStandardMaterial({ color: '#5c626a', roughness: 0.4, metalness: 0.7 });
+  const rim = new THREE.MeshStandardMaterial({ color: '#1d2023', roughness: 0.55, metalness: 0.4 });
+  const hubM = new THREE.MeshStandardMaterial({ color: '#3b4046', roughness: 0.45, metalness: 0.6 });
   const RIM = R * 0.6, half = W / 2;
   // carcass: profile (radius, z) from bead to bead with rounded shoulders, lathed round Y → turned to Z
   const prof = [];
@@ -632,9 +632,8 @@ function buildUCBody(root, pivot) {
   const cwGeo = new THREE.ExtrudeGeometry(cw, { depth: 1.9, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.06, bevelSegments: 3, curveSegments: 16 });
   cwGeo.translate(0, 0, -0.95);
   add(cwGeo, paint);
-  // louvres on the counterweight sides, tail lamps, tow pin
+  // tail lamps, tow pin
   [-1, 1].forEach((s) => {
-    for (let i = 0; i < 6; i++) add(new THREE.BoxGeometry(0.9, 0.035, 0.02), dark, -3.45, 1.15 + i * 0.12, s * 1.015);
     add(new THREE.BoxGeometry(0.05, 0.16, 0.28), lampR, -4.45, 1.95, s * 0.72);
     add(new THREE.BoxGeometry(0.05, 0.12, 0.2), lampA, -4.45, 1.74, s * 0.72);
   });
@@ -671,37 +670,43 @@ function buildUCBody(root, pivot) {
   };
   guard(2.6, 0.72, 2.02, R_W);
   guard(-3.4, 1.0, 1.92, R_W);
-  // boom tower: one solid teal block (as the reference), its back curving up from the counterweight,
-  // tapering to the foot pin; the boom heel sits in it with the pin through
+  // boom tower (reference): a slim teal column rising from the counterweight, front edge nearly
+  // upright, back edge curving up, ~0.9 m across at the foot pin
   {
     const shp = new THREE.Shape();
-    shp.moveTo(-3.8, 2.3); shp.lineTo(-1.95, 1.8); shp.lineTo(-2.15, pivot.y - 0.25);
-    shp.absarc(pivot.x, pivot.y, 0.5, -0.2, Math.PI * 0.95, false);
-    shp.quadraticCurveTo(-3.45, pivot.y - 0.35, -3.8, 2.3);
-    const geo = new THREE.ExtrudeGeometry(shp, { depth: 1.18, bevelEnabled: true, bevelSize: 0.06, bevelThickness: 0.06, bevelSegments: 3, curveSegments: 24 });
-    geo.translate(0, 0, -0.59);
+    shp.moveTo(-3.62, 2.3); shp.lineTo(-2.2, 1.8); shp.lineTo(-2.28, pivot.y - 0.1);
+    shp.absarc(pivot.x, pivot.y, 0.44, -0.1, Math.PI, false);
+    shp.quadraticCurveTo(-3.2, pivot.y - 0.55, -3.62, 2.3);
+    const geo = new THREE.ExtrudeGeometry(shp, { depth: 1.1, bevelEnabled: true, bevelSize: 0.05, bevelThickness: 0.05, bevelSegments: 3, curveSegments: 24 });
+    geo.translate(0, 0, -0.55);
     add(geo, paint);
   }
-  add(new THREE.CylinderGeometry(0.17, 0.17, 1.62, 24).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#8d96a2', roughness: 0.3, metalness: 0.9 }), pivot.x, pivot.y, 0);
-  // hydraulic lines leaving the tower side in four tidy U loops (reference), and a black junction box
-  const hoseM = new THREE.MeshStandardMaterial({ color: '#101113', roughness: 0.6 });
+  add(new THREE.CylinderGeometry(0.17, 0.17, 1.4, 24).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#8d96a2', roughness: 0.3, metalness: 0.9 }), pivot.x, pivot.y, 0);
+  // hydraulic lines (reference): four black hairpin loops standing out from the tower's back edge,
+  // stacked one above the other, plus the bundle dropping from them into the body
+  const hoseM = new THREE.MeshStandardMaterial({ color: '#0d0e10', roughness: 0.55 });
   [-1, 1].forEach((s) => {
+    const z = s * 0.66;                                         // on the tower's outer faces, in front of the boom tail
     for (let i = 0; i < 4; i++) {
-      const y = pivot.y - 0.95 + i * 0.09, z0 = s * 0.66, z1 = s * 0.86;
+      const y = 2.58 + i * 0.1, xr = -3.2, out = 0.62 - i * 0.04;
       const c = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(-3.42, y, z0), new THREE.Vector3(-3.42, y, z1), new THREE.Vector3(-3.36, y, z1 + s * 0.02),
-        new THREE.Vector3(-2.98, y - 0.02, z1), new THREE.Vector3(-2.92, y - 0.02, z0),
+        new THREE.Vector3(xr, y + 0.03, z), new THREE.Vector3(xr - out + 0.06, y + 0.03, z),
+        new THREE.Vector3(xr - out, y, z), new THREE.Vector3(xr - out + 0.06, y - 0.03, z), new THREE.Vector3(xr, y - 0.03, z),
       ]);
-      add(new THREE.TubeGeometry(c, 24, 0.028, 8), hoseM);
+      add(new THREE.TubeGeometry(c, 30, 0.034, 8), hoseM);
     }
-    add(new THREE.BoxGeometry(0.34, 0.3, 0.08), black, -2.75, 2.25, s * 0.64);
+    const drop = new THREE.CatmullRomCurve3([new THREE.Vector3(-3.3, 3.2, z), new THREE.Vector3(-3.55, 2.95, z), new THREE.Vector3(-3.5, 2.72, z)]);
+    add(new THREE.TubeGeometry(drop, 16, 0.04, 8), hoseM);
+    add(new THREE.BoxGeometry(0.3, 0.26, 0.08), black, -2.6, 2.2, s * 0.6);                    // junction box
   });
-  // amber beacon on a slim mast at the back of the tower (reference)
-  add(new THREE.CylinderGeometry(0.018, 0.018, 0.9, 8), black, -3.25, pivot.y + 0.1, 0.5);
-  add(new THREE.CylinderGeometry(0.06, 0.07, 0.11, 16), lampA, -3.25, pivot.y + 0.6, 0.5);
+  // hoses from the lift-cylinder base down into the hull (reference: black lines at the front)
+  [-1, 1].forEach((s) => {
+    const c = new THREE.CatmullRomCurve3([new THREE.Vector3(1.75, 1.75, s * 0.74), new THREE.Vector3(1.95, 1.45, s * 0.76), new THREE.Vector3(1.95, 1.05, s * 0.75)]);
+    add(new THREE.TubeGeometry(c, 16, 0.03, 8), hoseM);
+  });
   // cab: open black frame (thin pillars, solid lower panels, roof) round clear glass, so the seat,
   // the operator and the controls show through like the reference's
-  const CX0 = -1.2, CX1 = 0.3, CY0 = 1.95, CY1 = 3.42, CZ = 0.98, CW = 1.18, LOW = 2.32;
+  const CX0 = -1.2, CX1 = 0.3, CY0 = 1.95, CY1 = 3.6, CZ = 0.98, CW = 1.18, LOW = 2.32;   // tall cab (reference): head clear of the roof
   const cx = (CX0 + CX1) / 2, cl = CX1 - CX0;
   add(new THREE.BoxGeometry(1.75, 0.16, 1.35), black, cx, 1.88, CZ);                        // plinth
   add(new THREE.BoxGeometry(cl, LOW - CY0, CW), black, cx, (CY0 + LOW) / 2, CZ);            // lower panels
@@ -722,9 +727,9 @@ function buildUCBody(root, pivot) {
   const skin = new THREE.MeshStandardMaterial({ color: '#b98a6a', roughness: 0.7 });
   add(new THREE.BoxGeometry(0.5, 0.12, 0.5), seatM, cx - 0.2, LOW + 0.18, CZ);
   add(new THREE.BoxGeometry(0.12, 0.62, 0.48), seatM, cx - 0.47, LOW + 0.5, CZ);
-  add(new THREE.CapsuleGeometry(0.17, 0.42, 4, 10), suit, cx - 0.25, LOW + 0.62, CZ);         // torso
-  add(new THREE.SphereGeometry(0.11, 16, 12), skin, cx - 0.22, LOW + 1.0, CZ);                // head
-  add(new THREE.SphereGeometry(0.118, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#f2b51c', roughness: 0.5 }), cx - 0.22, LOW + 1.06, CZ);   // sits on top, face left clear   // hard hat
+  add(new THREE.CapsuleGeometry(0.17, 0.42, 4, 10), suit, cx - 0.25, LOW + 0.55, CZ);         // torso
+  add(new THREE.SphereGeometry(0.11, 16, 12), skin, cx - 0.22, LOW + 0.9, CZ);                // head
+  add(new THREE.SphereGeometry(0.118, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#f2b51c', roughness: 0.5 }), cx - 0.22, LOW + 0.96, CZ);   // sits on top, face left clear   // hard hat
   add(new THREE.CapsuleGeometry(0.06, 0.32, 4, 8), suit, cx + 0.02, LOW + 0.55, CZ - 0.17).rotation.z = 1.2;   // arms to the wheel
   add(new THREE.CapsuleGeometry(0.06, 0.32, 4, 8), suit, cx + 0.02, LOW + 0.55, CZ + 0.17).rotation.z = 1.2;
   add(new THREE.CylinderGeometry(0.04, 0.05, 0.55, 10), black, cx + 0.38, LOW + 0.25, CZ).rotation.z = 0.5;
@@ -796,6 +801,24 @@ export function upgradeStacker(rig) {
   G.PIVOT.set(-2.7, 3.5);
   parts.boom.position.set(G.PIVOT.x, G.PIVOT.y, 0);
   buildUCBody(parts.root, G.PIVOT);
+  // boom tail (reference): the boom runs on ~1.5 m behind the foot pin, tapering, with the amber
+  // beacon on a slim mast at its end (it rides the boom)
+  {
+    const tailM = new THREE.MeshStandardMaterial({ color: '#2b2e33', roughness: 0.5, metalness: 0.4 });
+    const s = new THREE.Shape();
+    s.moveTo(0.2, 0.46); s.lineTo(-1.55, 0.36); s.lineTo(-1.62, -0.05); s.lineTo(-1.2, -0.42); s.lineTo(0.2, -0.46);
+    const geo = new THREE.ExtrudeGeometry(s, { depth: 0.84, bevelEnabled: true, bevelSize: 0.03, bevelThickness: 0.03, bevelSegments: 2 });
+    geo.translate(0, 0, -0.42);
+    const tail = new THREE.Mesh(geo, tailM);
+    tail.castShadow = true;
+    parts.boom.add(tail);
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.85, 8), new THREE.MeshStandardMaterial({ color: '#16181b' }));
+    mast.position.set(-1.45, 0.85, 0.3);
+    parts.boom.add(mast);
+    const bcn = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.12, 16), new THREE.MeshStandardMaterial({ color: '#f39a1e', emissive: '#a35a00', emissiveIntensity: 0.5 }));
+    bcn.position.set(-1.45, 1.32, 0.3);
+    parts.boom.add(bcn);
+  }
   // hoses as on the reference: a tidy bundle along each side of the boom, clamped, turning down
   // behind the foot pin into the towers (they ride the boom; the far end barely moves at the pin)
   const hoseM = new THREE.MeshStandardMaterial({ color: '#111214', roughness: 0.65 });
