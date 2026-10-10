@@ -536,10 +536,11 @@ export function upgradeStacker(rig) {
       c.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; m.material.envMapIntensity = 0.35; } });
       return c;
     };
-    // hide the built meshes (the telescope group itself is a child of the boom: it stays). The
-    // built spreader stays: slim like the reference's (the model's is a 2 m tall block), dressed in
-    // the reference's colours: charcoal beam and rotator, yellow/black striped end beams, no lamps
-    [parts.chassis, parts.cabin, parts.boom, parts.boomInner].forEach((g) => g.children.forEach((c) => { if (c !== parts.boomInner) c.visible = false; }));
+    // Only the model's body (chassis + cab) is used. Wheels, boom, telescope, lift cylinders and
+    // spreader are the built ones, clean like the reference's: the model's were lumpy, broken and
+    // (wheels) cut with bits of mudguard. They get the reference's colours: charcoal boom with white
+    // lettering, black cylinders with chrome rods, charcoal spreader with hazard-striped end beams.
+    [parts.chassis, parts.cabin].forEach((g) => g.children.forEach((c) => { c.visible = false; }));
     const stripes = (() => {
       const c = document.createElement('canvas');
       c.width = 256; c.height = 64;
@@ -552,36 +553,30 @@ export function upgradeStacker(rig) {
       return t;
     })();
     const recolour = new Map();
-    parts.spreader.traverse((m) => {
-      if (!m.isMesh) return;
+    const dress = (group, { dullSteel }) => group.traverse((m) => {
+      if (!m.isMesh || !m.visible) return;
       if (m.material.emissive && m.material.emissive.getHex() !== 0) { m.visible = false; return; }   // lamps
-      if (!recolour.has(m.material)) {
+      if (m.material.map || m.material.transparent) return;                                        // lettering
+      const key = `${m.material.uuid}|${dullSteel}`;
+      if (!recolour.has(key)) {
         const mt = m.material.clone();
         const hsl = {}; mt.color.getHSL(hsl, THREE.SRGBColorSpace);   // judge the authored (sRGB) colour
         if (hsl.h > 0.1 && hsl.h < 0.18 && hsl.s > 0.5) { mt.color.set('#ffffff'); mt.map = stripes; }   // yellow → hazard stripes
-        else if (hsl.l > 0.6) mt.color.set('#7c828a');                                              // bright steel: dulled
-        else mt.color.set(hsl.l < 0.3 ? '#25282d' : '#33373d');                                     // charcoal
-        mt.metalness = 0.4; mt.roughness = 0.55;
-        recolour.set(m.material, mt);
+        else if (hsl.l > 0.6) { if (dullSteel) mt.color.set('#7c828a'); }                           // chrome rods stay chrome
+        else mt.color.set(hsl.l < 0.3 ? '#25282d' : '#2f3237');                                     // charcoal
+        if (!(hsl.l > 0.6 && !dullSteel)) { mt.metalness = 0.4; mt.roughness = 0.5; }
+        recolour.set(key, mt);
       }
-      m.material = recolour.get(m.material);
+      m.material = recolour.get(key);
     });
-    parts.cylinders.forEach((c) => { c.group.visible = false; });
+    dress(parts.spreader, { dullSteel: true });
+    dress(parts.boom, { dullSteel: false });
+    parts.cylinders.forEach((c) => dress(c.group, { dullSteel: false }));
     parts.wheels.forEach((w) => { w.visible = false; });
-    // joints measured off the model (blender/prep_stacker.py), metres
+    // the built boom swings about the model's foot pin (where the model's boom towers end)
     G.PIVOT.set(-3.2, 3.35);
-    G.TIP.set(9.60, -0.13);
-    G.CYL_B.set(1.64, 1.29, 0);
-    G.CYL_A.set(2.675, 0.725);
     parts.boom.position.set(G.PIVOT.x, G.PIVOT.y, 0);
     parts.root.add(get('STK_BODY'));
-    parts.boom.add(get('STK_BOOM'));
-    parts.boomInner.add(get('STK_INNER'));
-    const cyl = new THREE.Group();
-    cyl.position.copy(G.CYL_B);
-    cyl.add(get('STK_CYL'));
-    parts.root.add(cyl);
-    G.model = { cyl, len: 4.1814 };
     // wheels: the model's tyres are lumpy and were cut out of the body with bits of mudguard (they
     // wobbled when turning): clean round ones instead, like the reference's, black tyres on dark
     // rims, twin at the front (the model's tyres span |z| 0.64–1.91 there), single at the rear
