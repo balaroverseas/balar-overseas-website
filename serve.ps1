@@ -10,6 +10,16 @@ while ($l.IsListening) {
   $c = $l.GetContext()
   $p = [Uri]::UnescapeDataString($c.Request.Url.AbsolutePath.TrimStart('/'))
   if ($p -eq "") { $p = "index.html" }
+  # dev only: the page can save scene exports (for the Blender render) into _export/
+  if ($c.Request.HttpMethod -eq "PUT" -and $p -match '^_export/[\w.\-]+$') {
+    $dir = Join-Path $root "_export"
+    if (-not (Test-Path $dir)) { New-Item -ItemType Directory $dir | Out-Null }
+    $fs = [IO.File]::Create((Join-Path $root $p))
+    $c.Request.InputStream.CopyTo($fs)
+    $fs.Close()
+    $c.Response.Close()
+    continue
+  }
   $f = Join-Path $root $p
   if (Test-Path $f -PathType Leaf) {
     $b = [IO.File]::ReadAllBytes($f)

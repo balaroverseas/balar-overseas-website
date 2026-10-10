@@ -80,14 +80,18 @@ function setupHero(globe) {
 }
 
 // ---------------------------------------------------------------- journey overlays
-function setupJourney(journey) {
+function setupJourney(journey, port) {
   const sec = $('#services');
   const giant = $('#jGiant'), panel = $('#jPanel'), cards = $('#jCards'), rel = $('#jRel'), speed = $('.j-speed');
   const feats = $$('.j-feat'), relTitle = $('#jRel h2');
-  // The whole section is the live three.js scene now (the reach stacker included): the old
-  // pre-rendered stacker frames (#jSeq) are no longer shown or downloaded.
+  // The port phase (P 0–0.5: stacker, stack, truck pulling away) is a Cycles render of the live
+  // scene (blender/journey_render.py), shown over the page white; the live three.js scene takes
+  // over in a short cross-fade once the stacker is out of shot.
+  const P_PORT = 0.5;
   const seqWrap = $('#jSeq');
-  if (seqWrap) seqWrap.style.display = 'none';
+  seqWrap.style.background = '#fff';
+  const ground = seqWrap.querySelector('.j-ground');
+  if (ground) ground.style.display = 'none';      // the road is in the render
   const jCanvas = $('#journeyCanvas');
   jCanvas.style.opacity = 1;
   let cardsMax = 0;
@@ -101,6 +105,10 @@ function setupJourney(journey) {
     onUpdate: (s) => {
       const P = s.progress;
       journey && journey.setProgress(P);
+      if (port) port.setProgress(Math.min(1, P / P_PORT));
+      const seqOn = 1 - range(P, P_PORT - 0.015, P_PORT);
+      seqWrap.style.opacity = seqOn;
+      seqWrap.style.visibility = seqOn > 0 ? 'visible' : 'hidden';
       // B: services panel
       // timings measured off the reference (fractions of the section)
       const show = range(P, 0.46, 0.52) - range(P, 0.69, 0.72);
@@ -177,16 +185,18 @@ function setupPlane() {
 // ---------------------------------------------------------------- boot
 async function boot() {
   await Promise.race([document.fonts.ready, wait(2500)]);
-  const [globe, journey, ship] = await Promise.all([
+  const [globe, journey, port, ship] = await Promise.all([
     scene('globe', './scenes/globe.js', 'initGlobe', $('#globe'), $('#globeLabels')),
     scene('journey', './scenes/journey.js', 'initJourney', $('#journeyCanvas'), (v) => { $('#jSpeed').textContent = String(v).padStart(2, '0'); }),
+    // port phase: Cycles render of the stacker loading the truck
+    sequencePlayer($('#stackSeq'), { dir: 'seq/port', count: 240, fit: 'cover' }),
     // ship: pre-rendered Blender sequence (top-down, climbs into the clouds)
     sequencePlayer($('#shipCanvas'), { dir: 'seq/ship', count: 200, fit: 'cover', lazy: true }),
     plMapReady,
   ]);
 
   setupHero(globe);
-  setupJourney(journey);
+  setupJourney(journey, port);
   window.__journey = journey;   // frame-by-frame inspection handle (journey.inspect(p))
   setupShip(ship);
   setupPlane();
