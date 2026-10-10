@@ -591,107 +591,197 @@ function buildOTRWheel(R, W) {
 }
 
 /**
- * Swaps the built stacker for the textured model (Meshy "Reach Stacker" by oguz.backovski, CC0;
- * cut into parts by blender/prep_stacker.py). The model's own joints replace the kinematic
- * constants; the tip contract (solve/apply, SP_H) stays, so every pose keeps working.
+ * The reference stacker's body, built clean from its side view (measured at 1280x720 against our
+ * 6 m wheelbase, ~39.7 px/m): low hull between the axles with the deck at 1.8 m, a tall rounded
+ * counterweight at the back, teal boom towers to the foot pin, mudguards over the wheels (which sit
+ * outside the narrow hull), a black cab on the camera side with tinted glass, steps, lamps, panel
+ * seams and a small white logo. Satin teal paint with clearcoat, like the reference's machine.
  */
+function buildUCBody(root, pivot) {
+  const g = new THREE.Group();
+  root.add(g);
+  // under the page's bright environment the authored teal reads pale: deeper base, dimmer reflections
+  const paint = new THREE.MeshPhysicalMaterial({ color: '#2a7fa6', roughness: 0.48, metalness: 0.1, clearcoat: 0.45, clearcoatRoughness: 0.3, envMapIntensity: 0.55 });
+  const black = new THREE.MeshStandardMaterial({ color: '#16181b', roughness: 0.6, metalness: 0.3 });
+  const dark = new THREE.MeshStandardMaterial({ color: '#0f1113', roughness: 0.8 });
+  const seam = new THREE.MeshBasicMaterial({ color: '#1e4c60' });
+  const glass = new THREE.MeshPhysicalMaterial({ color: '#16222c', roughness: 0.06, metalness: 0.3, clearcoat: 1, envMapIntensity: 1.2 });
+  const lampW = new THREE.MeshStandardMaterial({ color: '#f4f6f8', emissive: '#c8d4e0', emissiveIntensity: 0.25 });
+  const lampR = new THREE.MeshStandardMaterial({ color: '#b3241c', emissive: '#7a120c', emissiveIntensity: 0.4 });
+  const lampA = new THREE.MeshStandardMaterial({ color: '#f39a1e', emissive: '#a35a00', emissiveIntensity: 0.4 });
+  const add = (geo, mat, x = 0, y = 0, z = 0) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z);
+    m.castShadow = true; m.receiveShadow = true;
+    g.add(m);
+    return m;
+  };
+  // side profile -> extrusion across the machine, centred on z, rounded edges
+  const slab = (pts, depth, mat, bevel = 0.05) => {
+    const s = new THREE.Shape(pts.map(([x, y]) => new THREE.Vector2(x, y)));
+    const geo = new THREE.ExtrudeGeometry(s, { depth: depth - 2 * bevel, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 3, curveSegments: 16 });
+    geo.translate(0, 0, -(depth - 2 * bevel) / 2);
+    return add(geo, mat);
+  };
+  // hull: low between the axles, deck at 1.8 m, front nose sloping down to the lamps
+  slab([[-2.35, 0.55], [3.2, 0.55], [3.5, 0.82], [3.5, 1.42], [3.18, 1.8], [-2.35, 1.8]], 1.44, paint);
+  // counterweight: full width at the back, rounded top, sloping into the towers
+  const cw = new THREE.Shape();
+  cw.moveTo(-4.38, 0.66); cw.lineTo(-2.3, 0.66); cw.lineTo(-2.3, 2.05); cw.lineTo(-2.6, 2.42);
+  cw.lineTo(-3.95, 2.42); cw.quadraticCurveTo(-4.38, 2.42, -4.38, 2.0); cw.lineTo(-4.38, 0.66);
+  const cwGeo = new THREE.ExtrudeGeometry(cw, { depth: 1.9, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.06, bevelSegments: 3, curveSegments: 16 });
+  cwGeo.translate(0, 0, -0.95);
+  add(cwGeo, paint);
+  // louvres on the counterweight sides, tail lamps, tow pin
+  [-1, 1].forEach((s) => {
+    for (let i = 0; i < 6; i++) add(new THREE.BoxGeometry(0.9, 0.035, 0.02), dark, -3.45, 1.15 + i * 0.12, s * 1.015);
+    add(new THREE.BoxGeometry(0.05, 0.16, 0.28), lampR, -4.45, 1.95, s * 0.72);
+    add(new THREE.BoxGeometry(0.05, 0.12, 0.2), lampA, -4.45, 1.74, s * 0.72);
+  });
+  add(new THREE.BoxGeometry(0.12, 0.22, 0.5), black, -4.45, 0.82, 0);
+  // black chassis rail along the bottom, front bumper with lamps
+  add(new THREE.BoxGeometry(5.9, 0.12, 1.36), black, 0.45, 0.52, 0);
+  add(new THREE.BoxGeometry(0.1, 0.3, 1.5), black, 3.53, 0.78, 0);
+  [-1, 1].forEach((s) => {
+    add(new THREE.BoxGeometry(0.05, 0.12, 0.26), lampW, 3.56, 1.18, s * 0.5);
+    add(new THREE.BoxGeometry(0.05, 0.07, 0.14), lampA, 3.56, 1.33, s * 0.62);
+  });
+  // panel seams on the visible faces (both sides)
+  [-1, 1].forEach((s) => {
+    const z = s * 0.722;
+    [-1.6, -0.2, 1.1, 2.3].forEach((x) => add(new THREE.BoxGeometry(0.012, 1.1, 0.006), seam, x, 1.17, z));
+    add(new THREE.BoxGeometry(5.6, 0.012, 0.006), seam, 0.45, 1.5, z);
+    add(new THREE.BoxGeometry(0.02, 1.6, 0.006), seam, -3.0, 1.55, s * 1.012);
+  });
+  // logo on the hull side (camera side), like the reference's small white mark
+  const logo = textPlane('BALAR OVERSEAS', 1.2, 0.18, { color: '#ffffff', px: 120, weight: 800 });
+  logo.position.set(0.95, 1.05, 0.725);              // between the steps and the front tyres
+  g.add(logo);
+  // mudguards over the wheels (outside the hull): front over the twin tyres, rear over the single
+  const guard = (x, zIn, zOut, r) => {
+    const s = new THREE.Shape();
+    const a0 = THREE.MathUtils.degToRad(12), a1 = THREE.MathUtils.degToRad(168);
+    s.absarc(0, 0, r + 0.12, a0, a1, false);
+    s.absarc(0, 0, r + 0.04, a1, a0, true);
+    const geo = new THREE.ExtrudeGeometry(s, { depth: zOut - zIn, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.02, bevelSegments: 2, curveSegments: 32 });
+    [1, -1].forEach((sd) => {
+      const m = add(geo.clone(), paint, x, R_W, 0);
+      m.position.z = sd > 0 ? zIn : -zOut;
+    });
+  };
+  guard(2.6, 0.72, 2.02, R_W);
+  guard(-3.4, 1.0, 1.92, R_W);
+  // boom towers: twin teal plates from the counterweight up round the foot pin, with the pin
+  [-1, 1].forEach((s) => {
+    const shp = new THREE.Shape();
+    shp.moveTo(-3.55, 2.3); shp.lineTo(-2.05, 1.75); shp.lineTo(-2.25, pivot.y - 0.05);
+    shp.absarc(pivot.x, pivot.y, 0.45, 0, Math.PI, false); shp.lineTo(-3.3, pivot.y - 0.5); shp.lineTo(-3.55, 2.3);
+    const geo = new THREE.ExtrudeGeometry(shp, { depth: 0.14, bevelEnabled: true, bevelSize: 0.03, bevelThickness: 0.03, bevelSegments: 3 });
+    const m = add(geo, paint);
+    m.position.z = s * 0.62 - 0.07;
+  });
+  add(new THREE.CylinderGeometry(0.17, 0.17, 1.62, 24).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#8d96a2', roughness: 0.3, metalness: 0.9 }), pivot.x, pivot.y, 0);
+  // cab: black frame on a plinth, on the camera side clear of the boom, big tinted glass
+  const CX0 = -1.2, CX1 = 0.3, CY0 = 1.95, CY1 = 3.42, CZ = 0.98, CW = 1.18;
+  add(new THREE.BoxGeometry(1.75, 0.16, 1.35), black, (CX0 + CX1) / 2, 1.88, CZ);
+  add(new RoundedBoxGeometry(CX1 - CX0, CY1 - CY0, CW, 3, 0.05), black, (CX0 + CX1) / 2, (CY0 + CY1) / 2, CZ);
+  add(new RoundedBoxGeometry(CX1 - CX0 + 0.12, 0.09, CW + 0.12, 2, 0.03), black, (CX0 + CX1) / 2, CY1 + 0.04, CZ);   // roof
+  const pane = (w, h, x, y, z, ry) => { const m = add(new THREE.PlaneGeometry(w, h), glass, x, y, z); m.rotation.y = ry; };
+  pane(CW - 0.16, 1.05, CX1 + 0.006, 2.82, CZ, Math.PI / 2);                     // windscreen
+  pane(CX1 - CX0 - 0.5, 1.0, CX0 + 0.62, 2.84, CZ + CW / 2 + 0.006, 0);        // side window
+  pane(0.32, 1.2, CX1 - 0.22, 2.72, CZ + CW / 2 + 0.006, 0);                    // door glass
+  pane(CW - 0.2, 0.9, CX0 - 0.006, 2.9, CZ, -Math.PI / 2);                      // rear window
+  add(new THREE.BoxGeometry(0.03, 1.25, 0.03), dark, CX1 - 0.4, 2.72, CZ + CW / 2 + 0.012);    // door seam
+  add(new THREE.BoxGeometry(0.12, 0.03, 0.03), new THREE.MeshStandardMaterial({ color: '#9aa1aa', metalness: 0.8, roughness: 0.3 }), CX1 - 0.48, 2.5, CZ + CW / 2 + 0.03);
+  add(new THREE.CylinderGeometry(0.07, 0.08, 0.12, 16), lampA, CX0 + 0.25, CY1 + 0.15, CZ);  // beacon
+  [-1, 1].forEach((s) => add(new THREE.BoxGeometry(0.06, 0.08, 0.16), lampW, CX1 + 0.04, CY1 - 0.06, CZ + s * 0.4));
+  // steps up to the cab (black ladder box with treads) on the camera side
+  // two thin stringers, open treads
+  [-0.3, 0.2].forEach((x) => add(new THREE.BoxGeometry(0.04, 1.25, 0.04), black, x, 1.18, 0.98));
+  for (let i = 0; i < 4; i++) add(new THREE.BoxGeometry(0.5, 0.035, 0.24), dark, -0.05, 0.72 + i * 0.3, 0.86);
+  return g;
+}
+
+/**
+ * Stacker in the reference's look, all clean built parts: its body (buildUCBody), off-the-road
+ * wheels, a charcoal boom with neatly clamped hoses, black lift cylinders with chrome rods and a
+ * slim charcoal spreader with hazard-striped end beams. The tip contract (solve/apply, SP_H) is
+ * unchanged, so every pose keeps working.
+ */
+const R_W = 0.82;
 export function upgradeStacker(rig) {
-  return loadGLB('assets/models/stacker.glb').then((src) => {
-    const { parts, G } = rig;
-    const get = (n) => {
-      const o = src.getObjectByName(n);
-      if (!o) return null;
-      const c = o.clone(true);
-      // the model's paint is fully metallic (its metal/rough map): under the page's bright white
-      // environment the navy read lilac; a dim reflection keeps the colours as Meshy shows them
-      c.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; m.material.envMapIntensity = 0.35; } });
-      return c;
-    };
-    // Only the model's body (chassis + cab) is used. Wheels, boom, telescope, lift cylinders and
-    // spreader are the built ones, clean like the reference's: the model's were lumpy, broken and
-    // (wheels) cut with bits of mudguard. They get the reference's colours: charcoal boom with white
-    // lettering, black cylinders with chrome rods, charcoal spreader with hazard-striped end beams.
-    [parts.chassis, parts.cabin].forEach((g) => g.children.forEach((c) => { c.visible = false; }));
-    const stripes = (() => {
-      const c = document.createElement('canvas');
-      c.width = 256; c.height = 64;
-      const g = c.getContext('2d');
-      g.fillStyle = '#f2b51c'; g.fillRect(0, 0, 256, 64);
-      g.fillStyle = '#16181b';
-      for (let x = -64; x < 256; x += 32) { g.beginPath(); g.moveTo(x, 64); g.lineTo(x + 16, 64); g.lineTo(x + 80, 0); g.lineTo(x + 64, 0); g.fill(); }
-      const t = new THREE.CanvasTexture(c);
-      t.colorSpace = THREE.SRGBColorSpace;
-      return t;
-    })();
-    const recolour = new Map();
-    const dress = (group, { dullSteel }) => group.traverse((m) => {
-      if (!m.isMesh || !m.visible) return;
-      if (m.material.emissive && m.material.emissive.getHex() !== 0) { m.visible = false; return; }   // lamps
-      if (m.material.map || m.material.transparent) return;                                        // lettering
-      const key = `${m.material.uuid}|${dullSteel}`;
-      if (!recolour.has(key)) {
-        const mt = m.material.clone();
-        const hsl = {}; mt.color.getHSL(hsl, THREE.SRGBColorSpace);   // judge the authored (sRGB) colour
-        if (hsl.h > 0.1 && hsl.h < 0.18 && hsl.s > 0.5) { mt.color.set('#ffffff'); mt.map = stripes; }   // yellow → hazard stripes
-        else if (hsl.l > 0.6) { if (dullSteel) mt.color.set('#7c828a'); }                           // chrome rods stay chrome
-        else mt.color.set(hsl.l < 0.3 ? '#25282d' : '#2f3237');                                     // charcoal
-        if (!(hsl.l > 0.6 && !dullSteel)) { mt.metalness = 0.4; mt.roughness = 0.5; }
-        recolour.set(key, mt);
-      }
-      m.material = recolour.get(key);
-    });
-    dress(parts.spreader, { dullSteel: true });
-    dress(parts.boom, { dullSteel: false });
-    parts.cylinders.forEach((c) => dress(c.group, { dullSteel: false }));
-    parts.wheels.forEach((w) => { w.visible = false; });
-    // the built boom swings about the model's foot pin (where the model's boom towers end)
-    G.PIVOT.set(-3.2, 3.35);
-    parts.boom.position.set(G.PIVOT.x, G.PIVOT.y, 0);
-    parts.root.add(get('STK_BODY'));
-    // boom foot: the model's towers were shredded there; clean twin plates up to the pin, and the
-    // pin itself (static), plus the hydraulic hoses running round the heel (they ride the boom)
-    const charcoal = new THREE.MeshStandardMaterial({ color: '#2b2e33', roughness: 0.5, metalness: 0.4 });
-    const pinM = new THREE.MeshStandardMaterial({ color: '#8d96a2', roughness: 0.3, metalness: 0.9 });
-    [-1, 1].forEach((s) => {
-      const shp = new THREE.Shape();
-      shp.moveTo(-4.15, 2.3); shp.lineTo(-2.35, 2.3); shp.lineTo(-2.85, G.PIVOT.y + 0.1);
-      shp.absarc(G.PIVOT.x, G.PIVOT.y, 0.42, 0, Math.PI, false); shp.lineTo(-3.75, 2.9); shp.lineTo(-4.15, 2.3);
-      const plate = new THREE.Mesh(new THREE.ExtrudeGeometry(shp, { depth: 0.12, bevelEnabled: true, bevelSize: 0.02, bevelThickness: 0.02, bevelSegments: 2 }), charcoal);
-      plate.position.z = s * 0.62 - 0.06;
-      plate.castShadow = true;
-      parts.root.add(plate);
-    });
-    const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 1.62, 24).rotateX(Math.PI / 2), pinM);
-    pin.position.set(G.PIVOT.x, G.PIVOT.y, 0);
-    parts.root.add(pin);
-    const hoseM = new THREE.MeshStandardMaterial({ color: '#111214', roughness: 0.7 });
-    [-0.28, -0.12, 0.12, 0.28].forEach((z, i) => {
-      // boom-local: from the top of the boom over the heel, round behind the pin, down into the body
+  const { parts, G } = rig;
+  [parts.chassis, parts.cabin].forEach((g) => g.children.forEach((c) => { c.visible = false; }));
+  const stripes = (() => {
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 64;
+    const g = c.getContext('2d');
+    g.fillStyle = '#f2b51c'; g.fillRect(0, 0, 256, 64);
+    g.fillStyle = '#16181b';
+    for (let x = -64; x < 256; x += 32) { g.beginPath(); g.moveTo(x, 64); g.lineTo(x + 16, 64); g.lineTo(x + 80, 0); g.lineTo(x + 64, 0); g.fill(); }
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  })();
+  const recolour = new Map();
+  const dress = (group, { dullSteel }) => group.traverse((m) => {
+    if (!m.isMesh || !m.visible) return;
+    if (m.material.emissive && m.material.emissive.getHex() !== 0) { m.visible = false; return; }   // lamps
+    if (m.material.map || m.material.transparent) return;                                        // lettering
+    const key = `${m.material.uuid}|${dullSteel}`;
+    if (!recolour.has(key)) {
+      const mt = m.material.clone();
+      const hsl = {}; mt.color.getHSL(hsl, THREE.SRGBColorSpace);   // judge the authored (sRGB) colour
+      if (hsl.h > 0.1 && hsl.h < 0.18 && hsl.s > 0.5) { mt.color.set('#ffffff'); mt.map = stripes; }   // yellow -> hazard stripes
+      else if (hsl.l > 0.6) { if (dullSteel) mt.color.set('#7c828a'); }                           // chrome rods stay chrome
+      else mt.color.set(hsl.l < 0.3 ? '#25282d' : '#2f3237');                                     // charcoal
+      if (!(hsl.l > 0.6 && !dullSteel)) { mt.metalness = 0.4; mt.roughness = 0.5; }
+      recolour.set(key, mt);
+    }
+    m.material = recolour.get(key);
+  });
+  dress(parts.spreader, { dullSteel: true });
+  dress(parts.boom, { dullSteel: false });
+  parts.cylinders.forEach((c) => dress(c.group, { dullSteel: false }));
+  parts.wheels.forEach((w) => { w.visible = false; });
+  // the reference's boom foot sits further forward and higher than the built one's
+  G.PIVOT.set(-2.7, 3.5);
+  parts.boom.position.set(G.PIVOT.x, G.PIVOT.y, 0);
+  buildUCBody(parts.root, G.PIVOT);
+  // hoses as on the reference: a tidy bundle along each side of the boom, clamped, turning down
+  // behind the foot pin into the towers (they ride the boom; the far end barely moves at the pin)
+  const hoseM = new THREE.MeshStandardMaterial({ color: '#111214', roughness: 0.65 });
+  const clampM = new THREE.MeshStandardMaterial({ color: '#5a6068', roughness: 0.4, metalness: 0.7 });
+  [-1, 1].forEach((s) => {
+    [0, 1].forEach((k) => {
+      const z = s * (0.5 + k * 0.07), y = -0.18 - k * 0.07;
       const c = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(1.6, 0.52, z), new THREE.Vector3(0.0, 0.62, z), new THREE.Vector3(-0.85, 0.35, z),
-        new THREE.Vector3(-1.0, -0.35 - i * 0.04, z * 1.3), new THREE.Vector3(-0.7, -0.95, z * 1.5),
+        new THREE.Vector3(6.2, y, z), new THREE.Vector3(1.0, y, z), new THREE.Vector3(-0.3, y + 0.08, z),
+        new THREE.Vector3(-0.72, -0.25, z), new THREE.Vector3(-0.62, -0.85, z * 0.9),
       ]);
-      const hose = new THREE.Mesh(new THREE.TubeGeometry(c, 40, 0.045, 8), hoseM);
+      const hose = new THREE.Mesh(new THREE.TubeGeometry(c, 60, 0.04, 8), hoseM);
       hose.castShadow = true;
       parts.boom.add(hose);
     });
-    // wheels: the model's tyres are lumpy and were cut out of the body with bits of mudguard (they
-    // wobbled when turning): clean round ones instead, like the reference's, black tyres on dark
-    // rims, twin at the front (the model's tyres span |z| 0.64–1.91 there), single at the rear
-    const R_W = 0.75;
-    const wheels = [];
-    [[2.6, 0.95, 0.6], [2.6, 1.6, 0.6], [-3.4, 1.42, 0.86]].forEach(([x, z, w]) => [1, -1].forEach((s) => {
-      const wh = buildOTRWheel(R_W, w);
-      const g = new THREE.Group();
-      g.position.set(x, R_W, s * z);
-      if (s < 0) wh.rotation.y = Math.PI;
-      g.add(wh);
-      parts.root.add(g);
-      wheels.push(g);
-    }));
-    parts.wheels.splice(0, parts.wheels.length, ...wheels);
-    return rig;
-  }).catch((e) => { console.warn('[3D] stacker model not loaded, keeping the built one', e); return rig; });
+    for (let x = 0.6; x < 6.2; x += 1.1) {
+      const cl = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.24, 0.05), clampM);
+      cl.position.set(x, -0.22, s * 0.545);
+      parts.boom.add(cl);
+    }
+  });
+  // wheels: off-the-road tyres outside the narrow hull, twin at the front, single at the rear
+  const wheels = [];
+  [[2.6, 1.05, 0.6], [2.6, 1.68, 0.6], [-3.4, 1.45, 0.86]].forEach(([x, z, w]) => [1, -1].forEach((s) => {
+    const wh = buildOTRWheel(R_W, w);
+    const g = new THREE.Group();
+    g.position.set(x, R_W, s * z);
+    if (s < 0) wh.rotation.y = Math.PI;
+    g.add(wh);
+    parts.root.add(g);
+    wheels.push(g);
+  }));
+  parts.wheels.splice(0, parts.wheels.length, ...wheels);
+  return Promise.resolve(rig);
 }
 
 // ------------------------------------------------------------------ choreography
