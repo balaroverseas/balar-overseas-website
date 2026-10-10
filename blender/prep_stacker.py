@@ -162,8 +162,25 @@ with bpy.context.temp_override(active_object=inner, selected_editable_objects=[i
     bpy.ops.object.join()
 
 
-# spreader: head-pin origin, as modelled
-extract('STK_SPREADER', [4], frame(HEAD), DEC)
+# spreader: head-pin origin. The model's spreader is run in to ~25 ft; a real one telescopes to
+# 40 ft: the end beams slide out and more of the arm shows. Same here, with the model's own arm:
+# the ends (|y| > ARM1) move out by GROW and a copy of the arm (ARM0..ARM1) fills the gap, so no
+# texture is stretched and nothing is recoloured.
+sp = extract('STK_SPREADER', [4], frame(HEAD), DEC)
+ARM0, ARM1, GROW = 1.0, 3.3, (12.192 - 7.57) / 2
+b3 = bmesh.new()
+b3.from_mesh(sp.data)
+arm = [f for f in b3.faces if ARM0 < abs(f.calc_center_median().y) < ARM1]
+ends = [f for f in b3.faces if abs(f.calc_center_median().y) >= ARM1]
+# detach the end faces first, so faces across the cut move whole instead of stretching into spikes
+split = bmesh.ops.split(b3, geom=ends)
+for v in {g for g in split['geom'] if isinstance(g, bmesh.types.BMVert)}:
+    v.co.y += math.copysign(GROW, v.co.y)
+dup = bmesh.ops.duplicate(b3, geom=arm)
+for v in [g for g in dup['geom'] if isinstance(g, bmesh.types.BMVert)]:
+    v.co.y += math.copysign(GROW, v.co.y)
+b3.to_mesh(sp.data)
+b3.free()
 
 # cylinder: chassis-pin origin, +Z along the cylinder
 d = (CYL_A - CYL_B)

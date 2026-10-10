@@ -211,7 +211,8 @@ export function initJourney(canvas, onSpeed) {
   const CARRY_D = RW / 2 + 3.4 + 0.4;
   const carryTip = new THREE.Vector2(CARRY_D, DECK_Y + 0.4 + H + SP_H);
   const downTip = new THREE.Vector2(CARRY_D, DECK_Y + H + SP_H);
-  const clearTip = new THREE.Vector2(CARRY_D - 0.4, DECK_Y + H + SP_H + 2.0);   // locks open, lifts well clear (reference 0.36–0.40)
+  const clearTip = new THREE.Vector2(CARRY_D, DECK_Y + H + SP_H + 1.0);   // locks open, lifts ~1 m clear and holds (reference 0.36–0.47)
+  const hoverTip = new THREE.Vector2(PICK_REACH, 2 * H + SP_H + 0.8);       // parked over the box at the start (reference 0–0.12)
   const restPose = { angle: 4 * Math.PI / 180, ext: 0 };
   const lerpPose = (p0, p1, u) => ({ angle: lerp(p0.angle, p1.angle, u), ext: lerp(p0.ext, p1.ext, u) });
   const tipPose = (a2, b2, u) => rig.solve(new THREE.Vector2(lerp(a2.x, b2.x, u), lerp(a2.y, b2.y, u)));
@@ -279,26 +280,24 @@ export function initJourney(canvas, onSpeed) {
     snap = false;
     const a = range(P, 0, A_END), b = range(P, A_END, B_END), c = range(P, B_END, 1);
 
-    // ---------------- reach stacker + box (phase A), reference timings in P:
-    // drive in & spreader onto the box 0–0.15 · lift 0.15–0.19 · back off turning to face the
-    // camera 0.19–0.26 · truck reverses in 0.30–0.34 · box down 0.34–0.35 · locks open,
-    // spreader lifts clear 0.35–0.40 · stacker backs away 0.38–0.42 (it never vanishes)
+    // ---------------- reach stacker + box (phase A), timings measured off the reference:
+    // parked at the stack, spreader hovering over the box 0–0.12 · down onto it 0.12–0.17, locks
+    // 0.165–0.18 · lift 0.18–0.21 · back off turning to face the camera 0.20–0.26 · truck reverses
+    // in 0.30–0.34 · box down 0.34–0.35 · locks open, spreader lifts ~1 m clear 0.355–0.385 and
+    // stays there: the stacker does not drive off, the truck leaves it behind (reference 0.40–0.47)
     const XC = 3.0;                                       // box (and trailer) x once on the truck
-    // after the drop it backs off, swings round to the left and drives out of the shot
-    // (fully out of the frame by 0.415, before it is switched off at 0.42)
-    const drive = seg(P, 0, 0.13), turnU = seg(P, 0.19, 0.26), back = seg(P, 0.385, 0.40), away = seg(P, 0.39, 0.418);
-    const rigX = lerp(lerp(RIG_PICK_X - 14, RIG_PICK_X, drive), XC, turnU) - 40 * Math.pow(away, 1.3);
-    const rigZ = lerp(ZP, -CARRY_D, turnU) - 3.5 * back - 2 * away;
+    const turnU = seg(P, 0.20, 0.26);
+    const rigX = lerp(RIG_PICK_X, XC, turnU);
+    const rigZ = lerp(ZP, -CARRY_D, turnU);
     rig.root.position.set(rigX, 0, rigZ);
-    rig.root.rotation.y = -Math.PI / 2 * turnU - Math.PI / 2 * seg(P, 0.39, 0.412);
+    rig.root.rotation.y = -Math.PI / 2 * turnU;
     let pose;
-    if (P < 0.15) pose = lerpPose(restPose, rig.solve(pickTip), seg(P, 0.04, 0.14));
-    else if (P < 0.19) pose = tipPose(pickTip, liftTip, seg(P, 0.15, 0.19));
-    else if (P < 0.34) pose = tipPose(liftTip, carryTip, seg(P, 0.19, 0.27));
+    if (P < 0.18) pose = tipPose(hoverTip, pickTip, seg(P, 0.12, 0.17));
+    else if (P < 0.21) pose = tipPose(pickTip, liftTip, seg(P, 0.18, 0.21));
+    else if (P < 0.34) pose = tipPose(liftTip, carryTip, seg(P, 0.21, 0.27));
     else if (P < 0.355) pose = tipPose(carryTip, downTip, seg(P, 0.34, 0.35));
-    else if (P < 0.385) pose = tipPose(downTip, clearTip, seg(P, 0.355, 0.385));
-    else pose = lerpPose(rig.solve(clearTip), restPose, seg(P, 0.385, 0.405));  // boom folds back to travel
-    pose.lock = P < 0.3 ? seg(P, 0.135, 0.15) : 1 - seg(P, 0.35, 0.355);
+    else pose = tipPose(downTip, clearTip, seg(P, 0.355, 0.385));
+    pose.lock = P < 0.3 ? seg(P, 0.165, 0.18) : 1 - seg(P, 0.35, 0.355);
     const tipL = rig.apply(pose);
     // wheels roll with the machine
     const rigMove = Math.hypot(rigX - (rig.root.userData.px ?? rigX), rigZ - (rig.root.userData.pz ?? rigZ));
@@ -330,7 +329,7 @@ export function initJourney(canvas, onSpeed) {
       // same way round as on the spreader (doors to the rear) — +π/2 here flipped the box at set-down
       box.rotation.set(0, -Math.PI / 2 - heading, 0);
       box.scale.setScalar(grow);
-    } else if (P >= 0.15) {
+    } else if (P >= 0.18) {
       tipWorld.set(tipL.x, tipL.y - SP_H - H, 0);
       rig.root.localToWorld(tipWorld);
       box.position.copy(tipWorld);
@@ -345,7 +344,9 @@ export function initJourney(canvas, onSpeed) {
     // the port is left behind with the truck: at 0.42 the stack is just off the right edge and the
     // stacker off the left, so they go then (the camera then follows the truck past where they stood)
     const inPort = P < A_END;
-    rig.root.visible = inPort;
+    // the stacker is left standing where it set the box down; it goes once the camera has left it
+    rig.root.visible = P < A_END + 0.08;
+
     stack.forEach((s) => { s.visible = inPort; });
     white.visible = P > B_END;
     shadowCatcher.visible = P < A_END + 0.05 || P > B_END;
@@ -367,8 +368,9 @@ export function initJourney(canvas, onSpeed) {
     if (P < A_END) {
       // wide over the stacker and the stack (ground ~80% down) → follows the box as it turns
       // towards the camera → settles on the loaded truck exactly as phase B picks it up
-      const wide = frame(lerp(RIG_PICK_X - 6, HERO_X - 9, drive), 0, 16);
-      wide.y = 0.6 * wide.h;
+      // reference 0–0.12: stacker and stack fill the frame, the stack ~68% across, ground at ~91%
+      const wide = frame(HERO_X - 6, 0, 12);
+      wide.y = 0.82 * wide.h;
       // measured off the reference at 1280×720: from the turn to the set-down the ground sits at
       // 90% of the height and the 40 ft box spans ~56% of the width, centred; 0.37 → 0.42 the view
       // drops to the services framing (ground 75% at 0.40, 60% by 0.42)
