@@ -114,6 +114,43 @@ INNER_FROM = 7.0                                 # boom-local x where the telesc
 part[(part == 1) & (lx >= INNER_FROM)] = 2
 print('FACES', {int(k): int((part == k).sum()) for k in np.unique(part)})
 
+# ---------------------------------------------------------------- livery as the reference's stacker
+# (asked for: "UC jaisa"): the maker's lettering is painted out, then the yellow bodywork turns the
+# reference's teal-blue and the red / navy boom its charcoal. Hue and saturation change, the
+# texture's own shading (value) is kept, so dirt, panels and shadows stay as modelled.
+src = px[..., :3].copy()                        # sRGB values
+r_, g_, b_ = src[..., 0], src[..., 1], src[..., 2]
+red = ((r_ > 0.45) & (g_ < 0.3) & (b_ < 0.3) & (r_ > 2.2 * g_)).astype(np.float32)
+yel = ((r_ > 0.6) & (g_ > 0.45) & (b_ < 0.35)).astype(np.float32)
+red_n, yel_n = box_mean(red, 40), box_mean(yel, 40)            # letters are big: wide neighbourhood
+fix_red = ((r_ > 0.62) & (g_ > 0.6) & (b_ > 0.55)) & (red_n > 0.3)   # white letters on the red boom
+fix_yel = ((r_ < 0.3) & (g_ < 0.3) & (b_ < 0.3)) & (yel_n > 0.45)    # dark letters on the yellow body
+for mask, base in ((fix_red, red), (fix_yel, yel)):
+    w = box_mean(base, 24) + 1e-6
+    for ch in range(3):
+        src[..., ch] = np.where(mask, box_mean(src[..., ch] * base, 24) / w, src[..., ch])
+mx_, mn_ = src.max(-1), src.min(-1)
+v = mx_
+s = np.where(mx_ > 1e-6, (mx_ - mn_) / np.maximum(mx_, 1e-6), 0)
+d = np.maximum(mx_ - mn_, 1e-6)
+rr, gg, bb = src[..., 0], src[..., 1], src[..., 2]
+h = np.where(mx_ == rr, ((gg - bb) / d) % 6, np.where(mx_ == gg, (bb - rr) / d + 2, (rr - gg) / d + 4)) / 6.0
+is_yel_px = (h > 25 / 360) & (h < 70 / 360) & (s > 0.4) & (v > 0.3)
+is_red_px = ((h < 18 / 360) | (h > 340 / 360)) & (s > 0.45) & (v > 0.2)
+is_navy_px = (h > 200 / 360) & (h < 260 / 360) & (s > 0.25) & (v < 0.6)
+H2, S2, V2 = h.copy(), s.copy(), v.copy()
+H2[is_yel_px], S2[is_yel_px], V2[is_yel_px] = 199 / 360, np.clip(s[is_yel_px] * 0.68, 0, 1), v[is_yel_px] * 0.74   # teal-blue body
+for m_ in (is_red_px, is_navy_px):                                                                                  # charcoal boom
+    H2[m_], S2[m_], V2[m_] = 215 / 360, 0.16, np.clip(v[m_] * 0.24 + 0.04, 0, 1)
+i_ = np.floor(H2 * 6).astype(int) % 6
+f_ = H2 * 6 - np.floor(H2 * 6)
+p_, q_, t_ = V2 * (1 - S2), V2 * (1 - f_ * S2), V2 * (1 - (1 - f_) * S2)
+out = np.stack([np.choose(i_, [V2, q_, p_, p_, t_, V2]), np.choose(i_, [t_, V2, V2, q_, p_, p_]), np.choose(i_, [p_, p_, t_, V2, V2, q_])], -1)
+px[..., :3] = out
+img.pixels[:] = px.ravel()
+img.update()
+print('LIVERY px', int(is_yel_px.sum()), int(is_red_px.sum()), int(is_navy_px.sum()), 'letters', int(fix_red.sum()), int(fix_yel.sum()))
+
 
 # ---------------------------------------------------------------- split into objects
 def extract(name, ids, frame, decimate):
@@ -162,25 +199,8 @@ with bpy.context.temp_override(active_object=inner, selected_editable_objects=[i
     bpy.ops.object.join()
 
 
-# spreader: head-pin origin. The model's spreader is run in to ~25 ft; a real one telescopes to
-# 40 ft: the end beams slide out and more of the arm shows. Same here, with the model's own arm:
-# the ends (|y| > ARM1) move out by GROW and a copy of the arm (ARM0..ARM1) fills the gap, so no
-# texture is stretched and nothing is recoloured.
-sp = extract('STK_SPREADER', [4], frame(HEAD), DEC)
-ARM0, ARM1, GROW = 1.0, 3.3, (12.192 - 7.57) / 2
-b3 = bmesh.new()
-b3.from_mesh(sp.data)
-arm = [f for f in b3.faces if ARM0 < abs(f.calc_center_median().y) < ARM1]
-ends = [f for f in b3.faces if abs(f.calc_center_median().y) >= ARM1]
-# detach the end faces first, so faces across the cut move whole instead of stretching into spikes
-split = bmesh.ops.split(b3, geom=ends)
-for v in {g for g in split['geom'] if isinstance(g, bmesh.types.BMVert)}:
-    v.co.y += math.copysign(GROW, v.co.y)
-dup = bmesh.ops.duplicate(b3, geom=arm)
-for v in [g for g in dup['geom'] if isinstance(g, bmesh.types.BMVert)]:
-    v.co.y += math.copysign(GROW, v.co.y)
-b3.to_mesh(sp.data)
-b3.free()
+# spreader: not exported. The page uses a slim built spreader like the reference's (the model's is
+# a 2 m tall block); its faces are simply left out.
 
 # cylinder: chassis-pin origin, +Z along the cylinder
 d = (CYL_A - CYL_B)

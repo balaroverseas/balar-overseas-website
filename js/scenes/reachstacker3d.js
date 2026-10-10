@@ -536,8 +536,36 @@ export function upgradeStacker(rig) {
       c.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; m.material.envMapIntensity = 0.35; } });
       return c;
     };
-    // hide the built meshes (the telescope group itself is a child of the boom: it stays)
-    [parts.chassis, parts.cabin, parts.boom, parts.boomInner, parts.spreader].forEach((g) => g.children.forEach((c) => { if (c !== parts.boomInner) c.visible = false; }));
+    // hide the built meshes (the telescope group itself is a child of the boom: it stays). The
+    // built spreader stays: slim like the reference's (the model's is a 2 m tall block), dressed in
+    // the reference's colours: charcoal beam and rotator, yellow/black striped end beams, no lamps
+    [parts.chassis, parts.cabin, parts.boom, parts.boomInner].forEach((g) => g.children.forEach((c) => { if (c !== parts.boomInner) c.visible = false; }));
+    const stripes = (() => {
+      const c = document.createElement('canvas');
+      c.width = 256; c.height = 64;
+      const g = c.getContext('2d');
+      g.fillStyle = '#f2b51c'; g.fillRect(0, 0, 256, 64);
+      g.fillStyle = '#16181b';
+      for (let x = -64; x < 256; x += 32) { g.beginPath(); g.moveTo(x, 64); g.lineTo(x + 16, 64); g.lineTo(x + 80, 0); g.lineTo(x + 64, 0); g.fill(); }
+      const t = new THREE.CanvasTexture(c);
+      t.colorSpace = THREE.SRGBColorSpace;
+      return t;
+    })();
+    const recolour = new Map();
+    parts.spreader.traverse((m) => {
+      if (!m.isMesh) return;
+      if (m.material.emissive && m.material.emissive.getHex() !== 0) { m.visible = false; return; }   // lamps
+      if (!recolour.has(m.material)) {
+        const mt = m.material.clone();
+        const hsl = {}; mt.color.getHSL(hsl, THREE.SRGBColorSpace);   // judge the authored (sRGB) colour
+        if (hsl.h > 0.1 && hsl.h < 0.18 && hsl.s > 0.5) { mt.color.set('#ffffff'); mt.map = stripes; }   // yellow → hazard stripes
+        else if (hsl.l > 0.6) mt.color.set('#7c828a');                                              // bright steel: dulled
+        else mt.color.set(hsl.l < 0.3 ? '#25282d' : '#33373d');                                     // charcoal
+        mt.metalness = 0.4; mt.roughness = 0.55;
+        recolour.set(m.material, mt);
+      }
+      m.material = recolour.get(m.material);
+    });
     parts.cylinders.forEach((c) => { c.group.visible = false; });
     parts.wheels.forEach((w) => { w.visible = false; });
     // joints measured off the model (blender/prep_stacker.py), metres
@@ -549,9 +577,6 @@ export function upgradeStacker(rig) {
     parts.root.add(get('STK_BODY'));
     parts.boom.add(get('STK_BOOM'));
     parts.boomInner.add(get('STK_INNER'));
-    const sp = get('STK_SPREADER');
-    sp.position.y = -(rig.SP_H - 1.70);              // model: head pin -> twistlocks 1.70 m
-    parts.spreader.add(sp);
     const cyl = new THREE.Group();
     cyl.position.copy(G.CYL_B);
     cyl.add(get('STK_CYL'));
