@@ -162,6 +162,8 @@ if cont_mats and os.path.exists(CONT_HI):
 PATCHES = [(0.229, 1.135, 2.025, 2.335), (0.200, 0.965, 1.510, 1.800), (0.200, 0.965, 1.180, 1.350)]
 RODS = [0.240, 0.606]
 PAINT = (0.651, 0.672, 0.693, 1.0)          # the doors' own paint, read off the scan's colour map beside the lettering
+MOB_TONE_SIDE = (0.54, 0.80, 1.0, 1.0)
+MOB_TONE = (0.62, 0.66, 0.473, 1.0)           # see the phone note below (linear multipliers)
 
 
 def mnode(nt, op, a, b=None):
@@ -243,6 +245,29 @@ for m in cont_mats:
         nt.links.new(mul.outputs['Result'], pick.inputs['B'])
         out = pick.outputs['Result']
         m['dark_paint'] = (0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]) < 0.2
+    # phones: the reference's grey box is a neutral light grey there (top view 196,196,196, door end
+    # ~185), where ours came out near white with a lilac cast from the sky; the grey box alone is toned
+    if args.mob and hexc.lower() not in ('2169b3', 'd34618'):
+        tone = nt.nodes.new('ShaderNodeMix')
+        tone.data_type = 'RGBA'
+        tone.blend_type = 'MULTIPLY'
+        tone.inputs['Factor'].default_value = 1.0
+        # the roof takes the sky's blue and the walls the sun's cream, so each gets its own tone
+        geo = nt.nodes.new('ShaderNodeNewGeometry')
+        nz = nt.nodes.new('ShaderNodeSeparateXYZ')
+        nt.links.new(geo.outputs['True Normal'], nz.inputs[0])
+        up = nt.nodes.new('ShaderNodeMapRange')
+        up.inputs['From Min'].default_value = 0.5
+        up.inputs['From Max'].default_value = 0.9
+        nt.links.new(nz.outputs['Z'], up.inputs['Value'])
+        tcol = nt.nodes.new('ShaderNodeMix')
+        tcol.data_type = 'RGBA'
+        tcol.inputs['A'].default_value = MOB_TONE_SIDE
+        tcol.inputs['B'].default_value = MOB_TONE
+        nt.links.new(up.outputs['Result'], tcol.inputs['Factor'])
+        nt.links.new(tcol.outputs['Result'], tone.inputs['B'])
+        nt.links.new(out, tone.inputs['A'])
+        out = tone.outputs['Result']
     for sock in users:
         nt.links.new(out, sock)
     # the scan's normal map is rough on the flat walls: under the sun and the blue sky each facet took

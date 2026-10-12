@@ -411,9 +411,11 @@ export function initJourney(canvas, onSpeed) {
           // (phones: the ship comes in under the truck further off, where its light boxes read a cool
           // blue-grey - 133,159,181 on the frame it arrives with - so the truck's box ends there instead)
           const [eR, eG, eB] = MOB ? [0.77, 0.9, 1.02] : [1.55, 1.55, 1.55];
-          o.material.color.r *= 1.6 + (eR - 1.6) * top;
-          o.material.color.g *= 1.38 + (eG - 1.38) * top;
-          o.material.color.b *= 1.5 + (eB - 1.5) * top;
+          // (phones start from the phone render's own grey roof, 198,197,199)
+          const [sR, sG, sB] = MOB ? [1.2, 1.16, 1.15] : [1.6, 1.38, 1.5];
+          o.material.color.r *= sR + (eR - sR) * top;
+          o.material.color.g *= sG + (eG - sG) * top;
+          o.material.color.b *= sB + (eB - sB) * top;
         });
       }
     } else if (Pr >= 0.18) {

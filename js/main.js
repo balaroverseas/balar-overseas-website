@@ -16,17 +16,17 @@ async function scene(name, path, fn, ...args) {
 }
 
 // ---------------------------------------------------------------- content
-const IMG = 'https://balaroverseas.com/wp-content/uploads/2026/02/';
+const IMG = 'assets/img/photos/';
 const industries = [
-  ['Home & Kitchenware', 'Modern household essentials & utility products.', 'home-and-kitchen-1-1200x800.png'],
-  ['Health & Personal Care', 'Wellness, hygiene & healthcare solutions.', 'Health-and-Cosmetics-1200x800.png'],
-  ['Baby Products', 'Safe, certified and trusted baby essentials.', 'baby-products-1200x800.png'],
-  ['Beauty Products', 'Skincare, cosmetics & personal grooming.', 'beauty-and-cosmetics.png'],
-  ['Home & Office Furniture', 'Functional and contemporary furniture.', 'home-and-office-furniture.png'],
-  ['Mobile Accessories', 'High-demand electronic accessories.', 'mobile-accessories.png'],
-  ['Sports, Fitness & Outdoors', 'Active lifestyle & performance gear.', 'sports-and-outdoor.png'],
-  ['Toys & Games', 'Creative, educational & recreational.', 'toys-and-games.png'],
-  ['Electronics', 'Gadgets, appliances & smart technology.', 'Electronics.png'],
+  ['Home & Kitchenware', 'Modern household essentials & utility products.', 'home-and-kitchen-1-1200x800.webp'],
+  ['Health & Personal Care', 'Wellness, hygiene & healthcare solutions.', 'Health-and-Cosmetics-1200x800.webp'],
+  ['Baby Products', 'Safe, certified and trusted baby essentials.', 'baby-products-1200x800.webp'],
+  ['Beauty Products', 'Skincare, cosmetics & personal grooming.', 'beauty-and-cosmetics.webp'],
+  ['Home & Office Furniture', 'Functional and contemporary furniture.', 'home-and-office-furniture.webp'],
+  ['Mobile Accessories', 'High-demand electronic accessories.', 'mobile-accessories.webp'],
+  ['Sports, Fitness & Outdoors', 'Active lifestyle & performance gear.', 'sports-and-outdoor.webp'],
+  ['Toys & Games', 'Creative, educational & recreational.', 'toys-and-games.webp'],
+  ['Electronics', 'Gadgets, appliances & smart technology.', 'Electronics.webp'],
 ];
 // bento grid: two large tiles, one wide, the rest small; each on its own soft tint
 const IND_TINT = ['#e9edff', '#ffe9dc', '#e3f6ee', '#ffe6ef', '#eef0f3', '#e6f3ff', '#fff3d6', '#f1e8ff', '#e2f4f7'];
@@ -402,9 +402,9 @@ async function boot() {
     // 375x812 - drawn across the width, with the ground line / box centre kept where that camera puts them
     // on a screen of another shape: 40.6% down in the side view, 27% once overhead)
     sequencePlayer($('#stackSeq'), MOB_SEQ ? {
-      dir: 'seq/port_m3', count: 120, fit: 'width',
+      dir: 'seq/port_mf2', count: 240, fit: 'width',
       view: ({ h, H, frame }) => {
-        const u = range((frame / 119) * 0.5, 0.193, 0.221), k = u * u * (3 - 2 * u);
+        const u = range((frame / 239) * 0.5, 0.193, 0.221), k = u * u * (3 - 2 * u);
         return { s: 1, dx: 0, dy: (0.406 + (0.27 - 0.406) * k - 0.5) * (H - h) };
       },
     } : {
