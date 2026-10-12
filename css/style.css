@@ -1004,3 +1004,11 @@ footer{padding-top:6vw}
   .f-links{gap:0 20px;padding-bottom:10px}
   .f-legal{padding:14px 0 6px}
 }
+
+/* phones: the page under the jet is opened by sliding a clipping box down and its content back up
+   (main.js, setupPlane) - two layer moves - instead of re-cutting a clip-path on the whole block
+   every scroll step */
+@media (max-width:759px){
+  .testi-content-inner{clip-path:none;background:none;padding-bottom:0;overflow:hidden;will-change:transform;pointer-events:none}
+  .testi-clip{background:#fff;padding-bottom:120px;will-change:transform;pointer-events:auto}
+}

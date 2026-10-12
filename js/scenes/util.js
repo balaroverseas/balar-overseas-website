@@ -327,7 +327,7 @@ export function createStage(canvas, opts = {}) {
   const clock = new THREE.Clock();
   renderer.setAnimationLoop(() => {
     const dt = Math.min(clock.getDelta(), 0.05);
-    if (!stage.visible) return;
+    if (!stage.visible || stage.paused) return;      // off-screen, or covered (see journey.pause)
     // one bad frame must never stop the scene: report once and keep looping
     try {
       if (stage.onFrame) stage.onFrame(clock.elapsedTime, dt);

@@ -559,6 +559,9 @@ export function initJourney(canvas, onSpeed) {
   const api = {
     setProgress(v) { target = v; },
     inspect(v) { target = v; snap = true; },
+    // phones: while the rendered frames cover the scene nothing of it shows, so it is not drawn at all;
+    // on resuming it jumps straight to where the page is
+    pause(v) { if (stage.paused && !v) snap = true; stage.paused = v; },
     step() { stage.onFrame(performance.now() / 1000, 0); },      // one update by hand (dev export in a hidden tab)
     debugCam: null, mobZoom: 0, mobPaint: 0,
     camera, scene, truck, box, rig, renderer: stage.renderer,

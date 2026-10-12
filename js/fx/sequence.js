@@ -2,7 +2,7 @@
 // Frames load progressively: first frame, then a coarse pass, then everything else,
 // so scrubbing works immediately and sharpens as frames arrive. With `lazy`, nothing
 // loads until load() or the first setProgress().
-export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contain', align = 'center', bleed = 0, anchor = null, onLayout = null, lazy = false, shadow = null, scaleAt = null, blend = false, warp = null, from = 0, view = null }) {
+export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contain', align = 'center', bleed = 0, anchor = null, onLayout = null, lazy = false, shadow = null, scaleAt = null, blend = false, warp = null, from = 0, cache = 0, view = null }) {
   const g = canvas.getContext('2d');
   const frames = new Array(count).fill(null);
   let current = from, frac = 0, W = 0, H = 0, dpr = 1;
@@ -14,7 +14,7 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contai
     return new Promise((res) => {
       const img = new Image();
       img.decoding = 'async';
-      img.onload = () => { frames[i] = img; if (Math.abs(i - current) < 3) draw(); res(); };
+      img.onload = () => { frames[i] = img; if (Math.abs(i - current) < 3) draw(); if (cache && Math.abs(i - current) <= cache * 2) tend(); res(); };
       img.onerror = () => { frames[i] = null; res(); };
       img.src = url(i);
     });
@@ -22,11 +22,36 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contai
 
   function nearest(i) {
     for (let d = 0; d < count; d++) {
-      if (frames[i - d]) return frames[i - d];
-      if (frames[i + d]) return frames[i + d];
+      if (frames[i - d]) return i - d;
+      if (frames[i + d]) return i + d;
     }
-    return null;
+    return -1;
   }
+
+  // cache (phones): a compressed frame is only decoded when it is first drawn, which costs a phone a
+  // visible hitch on every new frame - and it forgets them again when memory runs short. So the
+  // frames around the current one are decoded ahead of time and held as bitmaps (a few each side,
+  // more in the direction of travel); the ones left behind are released.
+  const bitmaps = new Map(), pending = new Set();
+  let dirSign = 1;
+  const hold = (i) => {
+    if (i < from || i >= count || bitmaps.has(i) || pending.has(i) || !frames[i] || !window.createImageBitmap) return;
+    pending.add(i);
+    createImageBitmap(frames[i]).then((b) => {
+      pending.delete(i);
+      if (Math.abs(i - current) > cache * 2 + 2) { b.close(); return; }
+      bitmaps.set(i, b);
+      if (i === current || i === current + 1) draw();
+    }).catch(() => { pending.delete(i); });
+  };
+  const tend = () => {
+    if (!cache) return;
+    const a = current - (dirSign > 0 ? Math.ceil(cache / 2) : cache * 2), b = current + (dirSign > 0 ? cache * 2 : Math.ceil(cache / 2));
+    for (let i = current; i <= b; i++) hold(i);
+    for (let i = current - 1; i >= a; i--) hold(i);
+    bitmaps.forEach((bm, i) => { if (i < a - 2 || i > b + 2) { bm.close(); bitmaps.delete(i); } });
+  };
+  const pic = (i) => bitmaps.get(i) || frames[i];
 
   function resize() {
     dpr = Math.min(devicePixelRatio || 1, 2);
@@ -37,8 +62,9 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contai
   }
 
   function draw() {
-    const img = nearest(current);
+    const at = nearest(current), img = at < 0 ? null : frames[at];
     if (!img || !W) return;
+    const src = pic(at);
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, W, H);
     // 'contain' may crop up to `bleed` of the width on narrow screens so the subject stays large
@@ -62,7 +88,7 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contai
       g.save();
       g.filter = `brightness(0) blur(${shadow.blur * (w / img.width)}px)`;
       g.globalAlpha = shadow.alpha;
-      g.drawImage(img, x + shadow.dx * w, y + shadow.dy * h, w, h);
+      g.drawImage(src, x + shadow.dx * w, y + shadow.dy * h, w, h);
       g.restore();
     }
     if (clipW) { g.save(); g.beginPath(); g.rect(x, 0, clipW, H); g.clip(); }
@@ -71,7 +97,7 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contai
     // camera would see it from the in-between position - enlarged and shifted - and this one, shrunk
     // the same way, fades out over it: the motion is continuous and the two never stand apart.
     // Without it the next frame is simply laid over this one by the fraction of the way to it.
-    const next = blend && frames[current] === img ? frames[current + 1] : null;
+    const next = blend && at === current && frames[current + 1] ? pic(current + 1) : null;
     if (next && warp) {
       const k = w / img.width, cx = x + w / 2, cy = y + h / 2, pos = current + frac;
       const put = (im, j) => {
@@ -80,10 +106,10 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contai
       };
       put(next, current + 1);
       g.globalAlpha = 1 - frac;
-      put(img, current);
+      put(src, current);
       g.globalAlpha = 1;
     } else {
-      g.drawImage(img, x, y, w, h);
+      g.drawImage(src, x, y, w, h);
       if (next && frac > 0.004) {
         g.globalAlpha = frac;
         g.drawImage(next, x, y, w, h);
@@ -93,7 +119,7 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contai
     if (clipW) g.restore();
     if (fit === 'width' && y + h < H - 1) {
       // below a frame that stops short of the bottom: carry its last row on down (ground or road)
-      g.drawImage(img, 0, img.height - 2, img.width, 1, x, y + h - 1, w, H - (y + h) + 2);
+      g.drawImage(src, 0, src.height - 2, src.width, 1, x, y + h - 1, w, H - (y + h) + 2);
     }
     onLayout && onLayout({ x, y, w, h, W, H, frame: current });
   }
@@ -122,7 +148,9 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contai
       const i = blend ? Math.min(count - 1, Math.floor(f)) : Math.round(f);
       const fr = blend ? f - i : 0;
       if (i === current && Math.abs(fr - frac) < 0.004) return;
+      if (i !== current) dirSign = i > current ? 1 : -1;
       current = i; frac = fr;
+      tend();
       if (!frames[i]) load(i);
       if (blend && i + 1 < count && !frames[i + 1]) load(i + 1);
       draw();

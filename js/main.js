@@ -236,7 +236,7 @@ function setupJourney(journey, port) {
       journey && journey.setProgress(P);
       if (port) port.setProgress(Math.min(1, P / P_PORT));
       const seqOn = mob && mobNew && !MOB_SEQ ? 0 : 1 - range(P, P_PORT - 0.015, P_PORT);
-      if (MOB_SEQ) jCanvas.style.opacity = seqOn >= 1 ? 0 : 1;      // the frames are see-through: no live scene behind them
+      if (MOB_SEQ) { jCanvas.style.opacity = seqOn >= 1 ? 0 : 1; journey && journey.pause(seqOn >= 1); }   // the frames are see-through: no live scene behind them
       seqWrap.style.opacity = seqOn;
       seqWrap.style.visibility = seqOn > 0 ? 'visible' : 'hidden';
       giant.style.opacity = range(P, 0.44, 0.48) - range(P, 0.69, 0.71);
@@ -363,9 +363,20 @@ function setupPlane() {
   // before the section top, at the top edge 13 px after it); the white page is drawn in below a
   // level line just behind its tail, and scrolls normally (no hold).
   const phone = matchMedia('(max-width:759px)');
+  // phones: the white page is opened from a level line by two layer moves (a clipping box slid down,
+  // its content slid back up by the same amount) - see the note in style.css
+  const inner = $('.testi-content-inner', sec);
+  let clipIn = null;
   const place = () => {
     const H = innerHeight, W = innerWidth;
     const d = -sec.getBoundingClientRect().top;
+    if (phone.matches && inner && !clipIn) {
+      clipIn = document.createElement('div');
+      clipIn.className = 'testi-clip';
+      while (inner.firstChild) clipIn.appendChild(inner.firstChild);
+      inner.appendChild(clipIn);
+    }
+    if (!phone.matches && clipIn) inner.style.transform = clipIn.style.transform = '';
     if (phone.matches) {
       // (re-measured: nose to tail is 684 px there, so the jet square is 1.9 screen widths; the page
       // opens 620 px behind the nose, i.e. just inside the tail, so the heading comes out from under it)
@@ -377,7 +388,12 @@ function setupPlane() {
       const S = 1.9 * W, c = (18 / 812) * H - 1.25 * d + 0.4766 * S;       // jet square, its centre y
       wrap.style.transform = `translate3d(0,${c - 0.5 * W - Math.max(-d, 0)}px,0) rotate(-90deg) scale(1.9)`;
       sh.style.transform = 'translate(-3%,4%) scale(0.8)';
-      sec.style.setProperty('--edge', Math.max(0, Math.max(0, c - 0.4766 * S + 0.438 * S) + d).toFixed(1));
+      // (the line's height on screen; once it is above the screen nothing visible is cut any more and
+      // the box goes back to rest, so it never hangs over the sections below)
+      const line = Math.max(0, c - 0.4766 * S + 0.438 * S), dpr = devicePixelRatio || 1;
+      const e = line > 0 ? Math.round(Math.max(0, line + d) * dpr) / dpr : 0;
+      inner.style.transform = `translate3d(0,${e}px,0)`;
+      clipIn.style.transform = `translate3d(0,${-e}px,0)`;
       return;
     }
     const q = ease(range(d, 0.2 * H, 2.2 * H));
@@ -422,7 +438,7 @@ async function boot() {
     // 375x812 - drawn across the width, with the ground line / box centre kept where that camera puts them
     // on a screen of another shape: 40.6% down in the side view, 27% once overhead)
     sequencePlayer($('#stackSeq'), MOB_SEQ ? {
-      dir: 'seq/port_mf2', count: 240, fit: 'width',
+      dir: 'seq/port_ms', count: 240, fit: 'width', cache: 9,      // (port_ms = the 1125 px renders of seq/port_mf2 at 750 px, what a phone draws)
       view: ({ h, H, frame }) => {
         const u = range((frame / 239) * 0.5, 0.193, 0.221), k = u * u * (3 - 2 * u);
         return { s: 1, dx: 0, dy: (0.406 + (0.27 - 0.406) * k - 0.5) * (H - h) };
@@ -458,7 +474,7 @@ async function boot() {
       // on an upright screen the frames come from seq/ship_m - the same frames cut to their middle
       // 1000 px, which is all such a screen can show (a wider phone-width window keeps the full ones)
       dir: SHIP_PHONE && innerWidth / innerHeight <= 0.6 ? 'seq/ship_m' : 'seq/ship', from: SHIP_PHONE ? 60 : 0,
-      count: 100, fit: 'cover', lazy: true, blend: SHIP_PHONE, warp: shipWarp,
+      count: 100, fit: 'cover', lazy: true, blend: SHIP_PHONE, warp: shipWarp, cache: SHIP_PHONE ? 5 : 0,
       view: ({ h, W, H }) => {
         if (W >= 760) return { s: 1, dx: 0, dy: 0 };
         return { s: 1, dx: 0, dy: -0.234 * h * (1 - SHIP_IN) };
