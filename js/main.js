@@ -409,6 +409,7 @@ const shipWarp = (pos, j) => {
   const F = shipT(pos), fj = Math.round(shipT(j)), zF = shipZ(F);
   return { m: shipZ(fj) / zF, dy: (shipY(F) - shipY(fj)) * (2560 / (0.75 * zF)) };
 };
+const SHIP_PHONE = matchMedia('(max-width:759px)').matches;
 let SHIP_IN = 1;      // phones: 0 as the ship comes in under the truck -> 1 once it is over it (see the ship player's view)
 const MOB_SEQ = !QS.has('live') && matchMedia('(max-width:759px)').matches;
 async function boot() {
@@ -453,7 +454,11 @@ async function boot() {
     // settles back over the last 0.32 screen of the slide, when its lower edge is still off-screen,
     // so no gap ever shows. SHIP_IN - 0 while sliding in, 1 from there on - is set by setupShip.)
     sequencePlayer($('#shipCanvas'), {
-      dir: 'seq/ship', count: 100, fit: 'cover', lazy: true, blend: matchMedia('(max-width:759px)').matches, warp: shipWarp,
+      // phones show only the last 40 frames (see PACE in setupShip): the earlier ones are not fetched, and
+      // on an upright screen the frames come from seq/ship_m - the same frames cut to their middle
+      // 1000 px, which is all such a screen can show (a wider phone-width window keeps the full ones)
+      dir: SHIP_PHONE && innerWidth / innerHeight <= 0.6 ? 'seq/ship_m' : 'seq/ship', from: SHIP_PHONE ? 60 : 0,
+      count: 100, fit: 'cover', lazy: true, blend: SHIP_PHONE, warp: shipWarp,
       view: ({ h, W, H }) => {
         if (W >= 760) return { s: 1, dx: 0, dy: 0 };
         return { s: 1, dx: 0, dy: -0.234 * h * (1 - SHIP_IN) };

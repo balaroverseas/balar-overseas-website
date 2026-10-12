@@ -2,14 +2,14 @@
 // Frames load progressively: first frame, then a coarse pass, then everything else,
 // so scrubbing works immediately and sharpens as frames arrive. With `lazy`, nothing
 // loads until load() or the first setProgress().
-export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contain', align = 'center', bleed = 0, anchor = null, onLayout = null, lazy = false, shadow = null, scaleAt = null, blend = false, warp = null, view = null }) {
+export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contain', align = 'center', bleed = 0, anchor = null, onLayout = null, lazy = false, shadow = null, scaleAt = null, blend = false, warp = null, from = 0, view = null }) {
   const g = canvas.getContext('2d');
   const frames = new Array(count).fill(null);
-  let current = 0, frac = 0, W = 0, H = 0, dpr = 1;
+  let current = from, frac = 0, W = 0, H = 0, dpr = 1;
   const url = (i) => `${dir}/f${String(i + 1).padStart(3, '0')}.${ext}`;
 
   function load(i) {
-    if (frames[i] !== null) return Promise.resolve();
+    if (i < from || frames[i] !== null) return Promise.resolve();   // (frames before `from` are never shown: not fetched)
     frames[i] = false; // loading
     return new Promise((res) => {
       const img = new Image();
@@ -101,12 +101,12 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contai
   new ResizeObserver(resize).observe(canvas);
   let ready = null;
   function start() {
-    ready = ready || load(0).then(async () => {
+    ready = ready || load(from).then(async () => {
       resize();
       const coarse = [];
-      for (let i = 0; i < count; i += 6) coarse.push(load(i));
+      for (let i = from; i < count; i += 6) coarse.push(load(i));
       await Promise.all(coarse);
-      for (let i = 0; i < count; i++) await load(i);
+      for (let i = from; i < count; i++) await load(i);
     });
     return ready;
   }
@@ -118,7 +118,7 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contai
     redraw: () => draw(),
     setProgress(p) {
       start();
-      const f = Math.max(0, Math.min(count - 1, p * (count - 1)));
+      const f = Math.max(from, Math.min(count - 1, p * (count - 1)));
       const i = blend ? Math.min(count - 1, Math.floor(f)) : Math.round(f);
       const fr = blend ? f - i : 0;
       if (i === current && Math.abs(fr - frac) < 0.004) return;
