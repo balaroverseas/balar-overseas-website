@@ -413,9 +413,12 @@ export function initJourney(canvas, onSpeed) {
           const [eR, eG, eB] = MOB ? [0.77, 0.9, 1.02] : [1.55, 1.55, 1.55];
           // (phones start from the phone render's own grey roof, 198,197,199)
           const [sR, sG, sB] = MOB ? [1.2, 1.16, 1.15] : [1.6, 1.38, 1.5];
-          o.material.color.r *= sR + (eR - sR) * top;
-          o.material.color.g *= sG + (eG - sG) * top;
-          o.material.color.b *= sB + (eB - sB) * top;
+          // (and drifts there over the whole text column - mobPaint - not over the last half screen,
+          // where the change showed as the truck drove on)
+          const pk = MOB ? api.mobPaint : top;
+          o.material.color.r *= sR + (eR - sR) * pk;
+          o.material.color.g *= sG + (eG - sG) * pk;
+          o.material.color.b *= sB + (eB - sB) * pk;
         });
       }
     } else if (Pr >= 0.18) {
@@ -556,7 +559,7 @@ export function initJourney(canvas, onSpeed) {
     setProgress(v) { target = v; },
     inspect(v) { target = v; snap = true; },
     step() { stage.onFrame(performance.now() / 1000, 0); },      // one update by hand (dev export in a hidden tab)
-    debugCam: null, mobZoom: 0,
+    debugCam: null, mobZoom: 0, mobPaint: 0,
     camera, scene, truck, box, rig, renderer: stage.renderer,
   };
   return api;

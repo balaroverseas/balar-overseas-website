@@ -247,7 +247,10 @@ function setupJourney(journey, port) {
           const span = sec.offsetHeight - 2 * H, d = raw * span, k = K();
           const t = range(P, 0.193, 0.221), dk = t * t * (3 - 2 * t), g = Math.round(255 - 238 * dk);
           sticky.style.background = `linear-gradient(rgb(${g},${g},${g}) 0 40.6%, #111 40.6%)`;
-          if (journey) { const zz = range(d, span - 0.6 * H, span - 0.1 * H); journey.mobZoom = zz * zz * (3 - 2 * zz); }
+          if (journey) {
+            const zz = range(d, span - 0.6 * H, span - 0.1 * H); journey.mobZoom = zz * zz * (3 - 2 * zz);
+            const pp = range(d, 2100 * k, span - 0.1 * H); journey.mobPaint = pp * pp * (3 - 2 * pp);
+          }
           giant.style.opacity = 1;
           giant.style.transform = `translate(${(15 - Math.min(1299, Math.max(0, d / k - 199))) * k}px,${-Math.max(0, d - 1573 * k)}px)`;
           jCanvas.style.transform = rel.style.transform = '';
@@ -390,6 +393,22 @@ function setupPlane() {
 // ---------------------------------------------------------------- boot
 // ?mob on a phone = the phone staging being built; add &live to see the live scene instead of its frames
 const QS = new URLSearchParams(location.search);
+// The ship frames' own camera (blender/ship.py: straight down, height cam_z(f) x 3 on a 144 mm lens, so
+// the 2560 px frame spans 0.75 x cam_z metres; it glides along the ship until timeline frame 136). The
+// 100 frames on disk are every other one of that 200-frame timeline. shipWarp gives, for a position
+// between two frames, how frame j must be scaled and shifted to look as from that position.
+const SHIP_Z = [[1, 86], [21, 70], [38, 70], [54, 79], [75, 93], [128, 152], [136, 194], [157, 267], [177, 790], [200, 1000]];
+const shipZ = (f) => {
+  for (let i = 1; i < SHIP_Z.length; i++) if (f <= SHIP_Z[i][0]) { const [a, za] = SHIP_Z[i - 1], [b, zb] = SHIP_Z[i]; return Math.exp(Math.log(za) + (Math.log(zb) - Math.log(za)) * ((f - a) / (b - a))); }
+  return 1000;
+};
+const shipSm = (f, a, b) => { const u = Math.min(1, Math.max(0, (f - a) / (b - a))); return u * u * (3 - 2 * u); };
+const shipY = (f) => { const y = -16 + 48 * shipSm(f, 1, 75); return y + (6 - y) * shipSm(f, 75, 136); };
+const shipT = (i) => 1 + (i * 199) / 99;
+const shipWarp = (pos, j) => {
+  const F = shipT(pos), fj = Math.round(shipT(j)), zF = shipZ(F);
+  return { m: shipZ(fj) / zF, dy: (shipY(F) - shipY(fj)) * (2560 / (0.75 * zF)) };
+};
 let SHIP_IN = 1;      // phones: 0 as the ship comes in under the truck -> 1 once it is over it (see the ship player's view)
 const MOB_SEQ = QS.has('mob') && !QS.has('live') && matchMedia('(max-width:759px)').matches;
 async function boot() {
@@ -434,7 +453,7 @@ async function boot() {
     // settles back over the last 0.32 screen of the slide, when its lower edge is still off-screen,
     // so no gap ever shows. SHIP_IN - 0 while sliding in, 1 from there on - is set by setupShip.)
     sequencePlayer($('#shipCanvas'), {
-      dir: 'seq/ship', count: 100, fit: 'cover', lazy: true,
+      dir: 'seq/ship', count: 100, fit: 'cover', lazy: true, blend: matchMedia('(max-width:759px)').matches, warp: shipWarp,
       view: ({ h, W, H }) => {
         if (W >= 760) return { s: 1, dx: 0, dy: 0 };
         return { s: 1, dx: 0, dy: -0.234 * h * (1 - SHIP_IN) };
