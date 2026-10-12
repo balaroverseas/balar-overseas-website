@@ -1015,3 +1015,11 @@ footer{padding-top:6vw}
 
 /* industry tiles are not links any more (hover lift kept) */
 .ind-cell{cursor:default}
+
+/* phones: the reference has no held hero there - its intro follows straight after one screen (text
+   in view by ~400 px, the stacker pinned at 2400 px). Ours held the hero for a further screen. */
+@media (max-width:759px){
+  .hero{height:170vh;height:calc(100svh + 70vh)}
+  /* and its paragraph stands on white from its first line (it used to come in over the glow) */
+  .intro{background:linear-gradient(180deg,rgba(255,255,255,0) 0,#fff 16vh);padding-top:17vh}
+}

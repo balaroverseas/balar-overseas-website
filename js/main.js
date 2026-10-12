@@ -168,7 +168,8 @@ function setupHero(globe) {
   const atmo = $('#atmo');
   const placeAtmo = () => {
     const s = Math.max(0, scrollY - (hero.getBoundingClientRect().top + scrollY));
-    const k = 720 / VH();                                    // keep the same pace on other screen heights
+    // (phones: the hero is held for 0.8 of a screen instead of 1.81, so the horizon climbs that much sooner)
+    const k = (720 / VH()) * (PHONE_MQ.matches ? 2.26 : 1);  // keep the same pace on other screen heights
     const top = (1.02 - 0.00143 * Math.max(0, s * k - 300)) * VH();
     atmo.style.transform = `translate3d(0,${top}px,0)`;
   };
