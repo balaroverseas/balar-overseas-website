@@ -35,12 +35,13 @@ const range = (p, a, b) => clamp01((p - a) / (b - a));
 const ease = (t) => t * t * (3 - 2 * t);
 
 export function initJourney(canvas, onSpeed) {
-  const stage = createStage(canvas, { fov: 14, shadows: true, env: true, far: 3000 });
+  // phones: a smaller drawing surface and no shadow pass (their page is flat, with no ground to shade)
+  const stage = createStage(canvas, { fov: 14, shadows: !MOB, env: true, far: 3000, maxDpr: MOB ? 1.5 : 1.75 });
   const { scene, camera } = stage;
 
   scene.add(new THREE.HemisphereLight('#ffffff', '#cfcfcf', 0.7));
   const sun = new THREE.DirectionalLight('#ffffff', 2.0);
-  sun.castShadow = true;
+  sun.castShadow = !MOB;
   sun.shadow.mapSize.set(2048, 2048);
   Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 30, bottom: -30, near: 1, far: 200 });
   sun.shadow.bias = -0.0004;
@@ -448,7 +449,7 @@ export function initJourney(canvas, onSpeed) {
     // stacker off the left, so they go then (the camera then follows the truck past where they stood)
     const inPort = P < A_END;
     // the stacker is left standing where it set the box down; it goes once the camera has left it
-    rig.root.visible = P < (MOB ? 0.5 : A_END + 0.08);
+    rig.root.visible = P < (MOB ? 0.47 : A_END + 0.08);      // (phones: left behind, out of shot, before the frames hand over)
 
     stack.forEach((s) => { s.visible = MOB ? P < 0.225 : inPort; });
     if (MOB) {

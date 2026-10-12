@@ -1012,3 +1012,6 @@ footer{padding-top:6vw}
   .testi-content-inner{clip-path:none;background:none;padding-bottom:0;overflow:hidden;will-change:transform;pointer-events:none}
   .testi-clip{background:#fff;padding-bottom:120px;will-change:transform;pointer-events:auto}
 }
+
+/* industry tiles are not links any more (hover lift kept) */
+.ind-cell{cursor:default}

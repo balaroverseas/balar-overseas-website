@@ -29,10 +29,20 @@ const industries = [
   ['Electronics', 'Gadgets, appliances & smart technology.', 'Electronics.webp'],
 ];
 // bento grid: two large tiles, one wide, the rest small; each on its own soft tint
+// Phones: the browser's own bars slide away and back as the page is scrolled, and innerHeight changes
+// with them every time. The pinned stages are sized in svh (the height with the bars showing), so the
+// scroll maths below uses that fixed height as well - otherwise sections change length, and everything
+// is laid out again, each time the bars move.
+const PHONE_MQ = matchMedia('(max-width:759px)');
+const svhProbe = document.createElement('div');
+svhProbe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:100svh;visibility:hidden;pointer-events:none';
+document.body.appendChild(svhProbe);
+const VH = () => (PHONE_MQ.matches && svhProbe.offsetHeight) || innerHeight;
+
 const IND_TINT = ['#e9edff', '#ffe9dc', '#e3f6ee', '#ffe6ef', '#eef0f3', '#e6f3ff', '#fff3d6', '#f1e8ff', '#e2f4f7'];
 const IND_SIZE = { 0: 'big', 7: 'big', 8: 'wide' };
 $('#indGrid').innerHTML = industries.map(([t, d, img], i) =>
-  `<a class="ind-cell ${IND_SIZE[i] || ''}" href="industries.html" style="--t:${IND_TINT[i]}"><span class="ind-no">${String(i + 1).padStart(2, '0')}</span><span class="ind-go" aria-hidden="true">→</span><img src="${IMG}${img}" alt="${t}" loading="lazy"><h3>${t}</h3><p>${d}</p></a>`).join('');
+  `<div class="ind-cell ${IND_SIZE[i] || ''}" style="--t:${IND_TINT[i]}"><span class="ind-no">${String(i + 1).padStart(2, '0')}</span><span class="ind-go" aria-hidden="true">→</span><img src="${IMG}${img}" alt="${t}" loading="lazy"><h3>${t}</h3><p>${d}</p></div>`).join('');
 
 const { lenis } = initCommon({ startStopped: true });
 
@@ -158,8 +168,8 @@ function setupHero(globe) {
   const atmo = $('#atmo');
   const placeAtmo = () => {
     const s = Math.max(0, scrollY - (hero.getBoundingClientRect().top + scrollY));
-    const k = 720 / innerHeight;                             // keep the same pace on other screen heights
-    const top = (1.02 - 0.00143 * Math.max(0, s * k - 300)) * innerHeight;
+    const k = 720 / VH();                                    // keep the same pace on other screen heights
+    const top = (1.02 - 0.00143 * Math.max(0, s * k - 300)) * VH();
     atmo.style.transform = `translate3d(0,${top}px,0)`;
   };
   ScrollTrigger.create({ trigger: hero, start: 'top top', end: 'bottom top', onUpdate: placeAtmo, onRefresh: placeAtmo });
@@ -212,17 +222,19 @@ function setupJourney(journey, port) {
     giant.dataset.full ??= giant.textContent;
     giant.textContent = mobNew && phone.matches ? 'Our services' : giant.dataset.full;      // the reference shows the words once there
     if (mobNew && phone.matches) { seqWrap.style.background = 'transparent'; if (!MOB_SEQ) { seqWrap.style.opacity = 0; seqWrap.style.visibility = 'hidden'; } else jCanvas.style.opacity = 0; sticky.style.background = 'linear-gradient(#fff 0 40.6%, #111 40.6%)'; }
-    sec.style.height = mobNew && phone.matches ? `${1478 * K() + col.offsetHeight + 1.4 * innerHeight + 2 * innerHeight}px` : '';
+    sec.style.height = mobNew && phone.matches ? `${1478 * K() + col.offsetHeight + 1.4 * VH() + 2 * VH()}px` : '';
   };
   fitPhone();
-  addEventListener('resize', fitPhone);
+  // (a phone's height-only changes are its bars moving, not a new layout)
+  let fitW = innerWidth;
+  addEventListener('resize', () => { if (phone.matches && innerWidth === fitW) return; fitW = innerWidth; fitPhone(); });
   phone.addEventListener('change', () => { place(); fitPhone(); ScrollTrigger.refresh(); });
 
   // P runs to 1 one screen before the section ends: that last screen is the ship sliding over
   ScrollTrigger.create({
     trigger: sec, start: 'top top', end: 'bottom 200%',
     onUpdate: (s) => {
-      const raw = s.progress, H = innerHeight, mob = phone.matches;
+      const raw = s.progress, H = VH(), mob = phone.matches;
       let P = raw, P0 = 0, Pb = 0;
       if (mob) {
         // the scene is run through faster (up to the top view on the last road, 0.9) so that the
@@ -314,10 +326,10 @@ function setupShip(ship) {
     // Blender frames are spread linearly over the section (frame = 1 + 199·S/0.97)
     ship && ship.setProgress(phone.matches ? pace(S) : Math.min(1, S / 0.97));
     veil.style.opacity = phone.matches ? 0 : 0.6 * range(S, 0.9, 1);   // the reference ends in a pale haze
-    const span = sec.offsetHeight - 2.2 * innerHeight;
-    const titleMid = 0.5 * innerHeight - 0.5 * title.offsetHeight;   // title centred at S = 0.7
+    const span = sec.offsetHeight - 2.2 * VH();
+    const titleMid = 0.5 * VH() - 0.5 * title.offsetHeight;   // title centred at S = 0.7
     const y = titleMid - (S - (phone.matches ? 0.62 : 0.7)) * span * 0.88;
-    flow.style.transform = `translate3d(0,${Math.min(y, innerHeight + 10)}px,0)`;
+    flow.style.transform = `translate3d(0,${Math.min(y, VH() + 10)}px,0)`;
     sec.dataset.dynTheme = 'dark';
   };
   // onUpdate never fires while the section is still scrolling in (progress stays 0), so set the
@@ -326,7 +338,7 @@ function setupShip(ship) {
   // phones: how far the section still has to rise (see the ship player's view)
   const slide = () => {
     if (!phone.matches) { SHIP_IN = 1; return; }
-    const v = 1 - range(sec.getBoundingClientRect().top, 0, 0.32 * innerHeight);
+    const v = 1 - range(sec.getBoundingClientRect().top, 0, 0.32 * VH());
     if (v !== SHIP_IN) { SHIP_IN = v; ship && ship.redraw(); }
   };
   slide();
@@ -368,7 +380,7 @@ function setupPlane() {
   const inner = $('.testi-content-inner', sec);
   let clipIn = null;
   const place = () => {
-    const H = innerHeight, W = innerWidth;
+    const H = VH(), W = innerWidth;
     const d = -sec.getBoundingClientRect().top;
     if (phone.matches && inner && !clipIn) {
       clipIn = document.createElement('div');

@@ -81,10 +81,16 @@ export function initCommon({ startStopped = false } = {}) {
   $$('.split').forEach((el) => splitWords(el));
   $$('.reveal-words').forEach((el) => splitWords(el, 'rw', null));
 
+  // phones: do not re-measure every trigger each time the browser's bars slide in or out
+  ScrollTrigger.config({ ignoreMobileResize: true });
   // Smooth scroll
   let lenis = null;
   if (!reduceMotion && window.Lenis) {
-    lenis = new window.Lenis({ lerp: 0.085, smoothWheel: true });
+    // lerp 0.12: the page settles sooner after the wheel stops, so text spends less time in motion
+    // (it reads as faded while it glides). The position is also kept on whole pixels on its way,
+    // so the letters are drawn sharp at every step instead of smeared between two rows.
+    lenis = new window.Lenis({ lerp: 0.12, smoothWheel: true });
+    if (typeof lenis.setScroll === 'function') { const put = lenis.setScroll.bind(lenis); lenis.setScroll = (v) => put(Math.round(v)); }
     lenis.on('scroll', ScrollTrigger.update);
     gsap.ticker.add((t) => lenis.raf(t * 1000));
     gsap.ticker.lagSmoothing(0);
