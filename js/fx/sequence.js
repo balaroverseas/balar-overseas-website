@@ -42,7 +42,10 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contai
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, W, H);
     // 'contain' may crop up to `bleed` of the width on narrow screens so the subject stays large
-    let s = fit === 'cover' ? Math.max(W / img.width, H / img.height) : Math.min((W / img.width) * (1 + bleed), H / img.height);
+    // 'width': the frame always spans the canvas width, centred — what a 3-D camera with a fixed
+    // horizontal field does on any screen shape, so frames rendered from such a camera line up with
+    // the live scene they hand over to (a tall screen shows them smaller, a wide one crops top and bottom)
+    let s = fit === 'width' ? W / img.width : fit === 'cover' ? Math.max(W / img.width, H / img.height) : Math.min((W / img.width) * (1 + bleed), H / img.height);
     if (scaleAt) s *= scaleAt(current);
     let w = img.width * s, h = img.height * s, clipW = 0;
     let x = (W - w) / 2;
@@ -65,6 +68,10 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contai
     if (clipW) { g.save(); g.beginPath(); g.rect(x, 0, clipW, H); g.clip(); }
     g.drawImage(img, x, y, w, h);
     if (clipW) g.restore();
+    if (fit === 'width' && y + h < H - 1) {
+      // below a frame that stops short of the bottom: carry its last row on down (ground or road)
+      g.drawImage(img, 0, img.height - 2, img.width, 1, x, y + h - 1, w, H - (y + h) + 2);
+    }
     onLayout && onLayout({ x, y, w, h, W, H, frame: current });
   }
 

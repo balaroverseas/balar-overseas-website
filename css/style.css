@@ -7,7 +7,7 @@
   --accent:#3b2cff;
   --orange:#ff8a3d;
   --gold:#e3cab6;
-  --display:"Saira","Helvetica Neue",Arial,sans-serif;
+  --display:"Oxanium","Helvetica Neue",Arial,sans-serif;
   --body:"Inter","Helvetica Neue",Arial,sans-serif;
   --mono:"Share Tech Mono",ui-monospace,monospace;
   --pad:clamp(16px,2.34vw,44px);
@@ -20,7 +20,7 @@ img{display:block;max-width:100%}
 a{color:inherit;text-decoration:none}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .wrap{max-width:2200px;margin:0 auto;padding:0 var(--pad)}
-.display{font-family:var(--display);font-stretch:125%;font-weight:700;text-transform:uppercase;line-height:.92;letter-spacing:-.005em}
+.display{font-family:var(--display);font-weight:700;text-transform:uppercase;line-height:.96;letter-spacing:.005em;text-wrap:balance}
 .mono{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase}
 .muted{color:#a5a5a5}
 .w{display:inline-block;overflow:hidden;vertical-align:top;padding-bottom:.06em;margin-bottom:-.06em}
@@ -42,17 +42,57 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 @media (pointer:coarse){.cursor{display:none}}
 
 /* ---------- Preloader ---------- */
-#preloader{position:fixed;inset:0;z-index:1000;background:#000;color:#fff;display:flex;flex-direction:column;justify-content:space-between;padding:28px var(--pad)}
-.pl-top{display:flex;justify-content:space-between;align-items:center}
-.pl-brand{font-family:var(--display);font-stretch:125%;font-weight:700;letter-spacing:.04em;font-size:14px}
-.pl-body{flex:1;display:grid;grid-template-columns:1fr minmax(280px,560px) 1fr;align-items:center;gap:24px}
-#plMap{width:100%;aspect-ratio:2/1}
-.pl-list{list-style:none;color:#6e6e6e;font-size:10px;line-height:1.9}
-.pl-list li.on{color:#fff}
+/* Two loaders, moving as the reference's do (see the preloader block in main.js). First visit of a
+   session: brand and count sit at mid-height beside the dot map, rise to stand above two lists that
+   come in line by line and tick upward while the count runs, then everything settles and fades.
+   Later visits: the name inside four rings that pop in, blow outward and blur away, and the page
+   opens from the centre through three widening discs (black, then two greys). */
+#preloader{position:fixed;inset:0;z-index:1000;color:#fff;overflow:hidden;contain:layout paint;isolation:isolate}
+.pl-brand{font-family:var(--display);font-stretch:125%;font-weight:700;letter-spacing:.04em;font-size:14px;white-space:nowrap}
+/* first loader: the full logo (mark + name); between the rings: the mark alone, large */
+img.pl-brand{display:block;width:auto;height:54px}
+img.pl-page-logo{height:clamp(130px,15vmax,230px)}
+.pl-home{position:absolute;inset:0;background:#000;display:grid;grid-template-columns:1fr minmax(280px,606px) 1fr;align-items:center;gap:24px;padding:0 var(--pad)}
+.pl-col{position:relative}
+.pl-rise{position:absolute;left:0;bottom:50%;margin-bottom:28px;opacity:0}
+.pl-col.right .pl-rise{left:auto;right:0}
+.pl-prog{display:flex;align-items:center;gap:8px;font-size:12px}
+.pl-ic{width:14px;height:14px;border-radius:50%;border:2px dotted #fff}
+.pl-win{overflow:hidden;height:171px}
+#plMap{width:100%;aspect-ratio:2/1;opacity:0}
+.pl-list{list-style:none;color:#6e6e6e;font-size:10px;line-height:19px}
+.pl-list li{height:19px;opacity:0}
 .pl-list.right{text-align:right}
-.pl-bar{height:1px;background:#222}
+.pl-bar{position:absolute;left:var(--pad);right:var(--pad);bottom:28px;height:1px;background:#222}
 .pl-bar span{display:block;height:100%;width:0;background:#fff}
-@media (max-width:760px){.pl-body{grid-template-columns:1fr}.pl-list{display:none}}
+.pl-page{position:absolute;inset:0;display:grid;place-items:center;visibility:hidden}
+.pl-page-logo{position:relative;z-index:6;opacity:0}
+.pl-circ{position:absolute;z-index:5;left:50%;top:50%;border:1px solid #29292e;border-radius:50%;opacity:0}
+.pl-circ.c1{width:30vmax;height:30vmax}.pl-circ.c2{width:45vmax;height:45vmax}.pl-circ.c3{width:60vmax;height:60vmax}.pl-circ.c4{width:75vmax;height:75vmax}
+.pl-mask{position:absolute;left:50%;top:50%;width:0;height:0;border-radius:50%;transform:translate(-50%,-50%);will-change:width,height;box-shadow:0 0 0 100vmax #000}
+.pl-mask.m1{z-index:3}.pl-mask.m2{z-index:2;box-shadow:0 0 0 100vmax #181818}.pl-mask.m3{z-index:1;box-shadow:0 0 0 100vmax #343434}
+#preloader.again .pl-home{display:none}
+#preloader.again .pl-page{visibility:visible}
+/* Phones - the first loader as the reference lays it out there (read off it at 375x812 while it ran):
+   the map across the middle (344 x 177); the brand at the left and the count at the right, both at
+   mid-height to begin with; the left list in a window at the top left (112 px down, nine 11.45 px rows),
+   the right list in one at the bottom right (631 px down); the brand rises to stand 23 px above the
+   left list, the count drops to stand 23 px above the right one, and both come back at the end. */
+@media (max-width:760px){
+  .pl-home{display:block;padding:0}
+  .pl-col{position:absolute;left:4vw;top:13.8vh;width:42vw}
+  .pl-col.right{left:auto;right:4vw;top:77.7vh;width:44vw}
+  .pl-win{height:27.47vw}
+  .pl-list{font-size:2.45vw;line-height:3.053vw}
+  .pl-list li{height:3.053vw}
+  #plMap{position:absolute;left:4vw;top:50%;width:92vw;transform:translateY(-50%)}
+  img.pl-brand{height:8vw}
+  .pl-prog{font-size:2.6vw;gap:6px}
+  .pl-ic{width:13px;height:13px}
+  .pl-rise{margin-bottom:6.1vw;bottom:calc(27.47vw - 36.2vh - 4vw - 6.1vw + 2.7vw)}
+  .pl-col.right .pl-rise{bottom:calc(27.47vw + 27.7vh - 6px - 6.1vw)}
+  .pl-bar{display:none}
+}
 
 /* ---------- Header ---------- */
 .site-head{position:fixed;top:0;left:0;right:0;z-index:100;color:#fff;transition:color .4s,transform .5s cubic-bezier(.7,0,.2,1)}
@@ -65,9 +105,18 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .top-links{display:flex;gap:10px;white-space:nowrap}
 .top-links a:hover{opacity:.6}
 .bar{display:flex;align-items:center;height:64px;padding:0 var(--pad);gap:40px}
-.logo{height:42px;display:flex;align-items:center}
-.logo img{height:100%;width:auto;transition:filter .4s}
-.site-head[data-theme="light"] .logo img{filter:invert(1) hue-rotate(180deg)}
+/* the full logo at the top of the page, just the mark once scrolled; each comes in two drawings
+   (white lettering for dark sections, dark lettering for light ones) that cross-fade with the theme */
+.logo{position:relative;height:52px;width:130px;flex:none;transition:width .5s cubic-bezier(.7,0,.2,1)}
+.logo .lg{position:absolute;left:0;top:0;height:100%;transform-origin:0 50%;transition:opacity .4s,transform .5s cubic-bezier(.7,0,.2,1)}
+.logo img{display:block;height:100%;width:auto;max-width:none;transition:opacity .4s}
+.logo img+img{position:absolute;left:0;top:0;opacity:0}
+.site-head[data-theme="light"] .logo img{opacity:0}
+.site-head[data-theme="light"] .logo img+img{opacity:1}
+.logo .lg-mark{opacity:0;transform:scale(.7)}
+.site-head:not(.at-top) .logo{width:37px}
+.site-head:not(.at-top) .lg-full{opacity:0;transform:scale(.7)}
+.site-head:not(.at-top) .lg-mark{opacity:1;transform:none}
 .menu-btn{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:12px;text-transform:uppercase}
 .menu-btn .dots{display:flex;gap:3px;font-style:normal}
 .menu-btn .dots b{width:3px;height:3px;background:currentColor;border-radius:50%;transition:transform .3s}
@@ -100,11 +149,22 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .hero{position:relative;height:281vh;background:#000;color:#fff}
 .hero-sticky{position:sticky;top:0;height:100vh;height:100svh;overflow:hidden}
 .stars{position:absolute;inset:0;background:radial-gradient(ellipse 60% 40% at 40% 35%,rgba(120,100,180,.12),transparent 70%)}
-.hero-globe{position:absolute;top:0;right:-14vw;width:78vw;height:100%;cursor:grab}
-.hero-globe canvas{width:100%;height:100%;display:block}
-.globe-labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
-.glabel{position:absolute;left:0;top:0;font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;color:#fff;background:rgba(0,0,0,.75);border:1px solid rgba(255,255,255,.3);padding:2px 6px;margin:-24px 0 0 6px;opacity:0}
-.glabel.home{border-color:var(--orange)}
+.hero-globe{position:absolute;inset:0;pointer-events:none}
+.hero-globe canvas,.vmo-globe canvas{position:relative;z-index:1;width:100%;height:100%;display:block;pointer-events:none}
+.globe-labels{position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden}
+/* The planet itself: four discs of inset and outer shadow under the dotted canvas (placed and sized
+   by scenes/globe.js, which also sets the font-size so 90.4em is the disc's width). Turned half a
+   turn, so the orange light sits on the upper rim and the deep blue wells up from below. */
+.globe-glow{position:absolute;border-radius:50%;pointer-events:auto;cursor:grab;opacity:0}
+.globe-glow.dragging{cursor:grabbing}
+.globe-glow>div{position:absolute;inset:0;transform:rotate(180deg)}
+.globe-glow i{position:absolute;inset:0;border-radius:50%}
+.globe-glow .o{background:#000;box-shadow:0 .081em .162em 0 #ffbc75,0 .647em 1.3em 0 #ff834a,inset 0 -5.5em 3.8em -4.2em #f50,inset 0 -5.6em 8em .57em #321500}
+.globe-glow .b{box-shadow:inset 0 7.1em 7.2em -2.4em #012fff,inset 0 18.8em 14.2em -4.1em #021777}
+.globe-glow .bp{mix-blend-mode:plus-lighter;background:#000;box-shadow:-.081em -.081em .24em -2.5em #75bcff,-.323em -.323em 1.3em -3.1em #4781ff,-.647em -.97em 3.2em 0 #0046dd,inset 0 2.6em 5em -2.1em #8dedff}
+.globe-glow .op{mix-blend-mode:plus-lighter;background:#000;box-shadow:inset 0 -2.8em 2.3em -2.1em #ffd1b0}
+.glabel{position:absolute;left:0;top:0;font-family:var(--mono);font-size:clamp(9px,.62vw,12px);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;color:#fff;background:#111;padding:.6em .8em;margin:-5px 0 0 5px;opacity:0;filter:blur(4px);transition:opacity .3s,filter .3s}
+.glabel.on{opacity:1;filter:none}
 /* hero copy sits in the nav-list column (28.75vw) near the bottom, sized in vw like the reference */
 .hero-copy{position:absolute;left:28.75vw;bottom:4vh;z-index:2;max-width:42vw}
 .kicker{font-family:var(--display);font-stretch:125%;font-weight:600;text-transform:uppercase;font-size:clamp(13px,1.16vw,22px);margin-bottom:.6vw}
@@ -120,7 +180,13 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .intro{position:relative;z-index:4;margin-top:-80vh;background:linear-gradient(180deg,rgba(255,255,255,0) 0,#fff 55vh);padding:6vh 0 30px}
 .intro-grid{display:grid;grid-template-columns:60.3vw 1fr;gap:0;align-items:start}
 .intro-left{position:sticky;top:110px;padding-top:8.1vw}
-.intro-img{width:17vw;min-width:160px;aspect-ratio:217/138;object-fit:cover;margin-bottom:2.8vw}
+/* our own render of the ship from above, in a rounded frame that drifts slowly; an accent bar
+   stands beside the heading */
+.intro-media{width:30vw;min-width:220px;aspect-ratio:16/10;border-radius:14px;overflow:hidden;margin-bottom:2.8vw;box-shadow:0 30px 60px -30px rgba(20,24,80,.55);transform:translateZ(0)}
+.intro-media img{width:100%;height:100%;object-fit:cover;animation:introDrift 18s ease-in-out infinite alternate}
+@keyframes introDrift{from{transform:scale(1.03)}to{transform:scale(1.14) translateX(-2%)}}
+.intro-title{position:relative;padding-left:1.4vw}
+.intro-title::before{content:"";position:absolute;left:0;top:.12em;bottom:.12em;width:4px;border-radius:4px;background:linear-gradient(180deg,var(--accent),var(--orange))}
 .intro-title{font-size:clamp(34px,4.17vw,80px);line-height:1.05;max-width:36vw}
 .reveal-text{font-family:var(--body);font-weight:500;font-size:clamp(18px,1.62vw,32px);line-height:1.2;letter-spacing:-.01em;margin-bottom:3.4vw}
 .reveal-text .rw{color:#d2d2d2;transition:color .25s}
@@ -129,7 +195,11 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .reveal-text em .rw.on{color:var(--accent)}
 .stats{margin-top:11.3vw}
 .stats-cap{font-size:clamp(12px,.93vw,16px);padding-bottom:1.1vw;border-bottom:1px solid var(--line);margin-bottom:2.2vw}
-.stat{border-bottom:1px solid var(--line);padding:0 0 4.9vw;margin-bottom:3.4vw}
+/* each figure: its "+" in the accent colour, and the rule under it drawn in as the count starts */
+.stat{position:relative;border-bottom:1px solid var(--line);padding:0 0 4.9vw;margin-bottom:3.4vw}
+.stat::after{content:"";position:absolute;left:0;bottom:-1px;height:2px;width:100%;background:linear-gradient(90deg,var(--accent),var(--orange));transform:scaleX(0);transform-origin:0 50%;transition:transform 1.6s cubic-bezier(.2,.7,.2,1) .2s}
+.stat.in::after{transform:scaleX(1)}
+.stat .num i{font-style:normal;color:var(--accent)}
 .stat .num{font-family:var(--display);font-stretch:125%;font-weight:700;font-size:clamp(60px,9.26vw,170px);line-height:1.05}
 .stat .lbl{margin-top:1.4vw;font-size:clamp(14px,1.39vw,24px);color:rgba(17,17,17,.72)}
 
@@ -175,7 +245,8 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .curve.glow{overflow:visible;box-shadow:0 -30px 80px -10px rgba(59,44,255,.75),0 -6px 24px rgba(90,70,255,.9)}
 
 /* ---------- Ship ---------- */
-.ship{position:relative;z-index:3;margin-top:-100vh;margin-top:-100svh;height:850vh;background:#071d57}
+/* the last 120vh are a hold: the ship's final view stays put while the jet draws the next page over it */
+.ship{position:relative;z-index:3;margin-top:-100vh;margin-top:-100svh;height:970vh;background:#071d57}
 .ship-sticky{position:sticky;top:0;height:100vh;height:100svh;overflow:hidden;color:#fff}
 #shipCanvas{position:absolute;inset:0;width:100%;height:100%;display:block;background:#0a2466}
 /* title + cards scroll up over the ship as one block in the last third (reference: 2 columns
@@ -194,35 +265,62 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .veil{position:absolute;inset:0;background:#fff;opacity:0;z-index:3;pointer-events:none}
 
 /* ---------- Testimonials + plane ---------- */
-.testi{position:relative;background:#fff;padding-bottom:120px}
-/* like the reference: a sticky full-screen stage; a huge top-down jet (nose right) crosses it
-   left → right over the pinned white panel, growing slightly, its soft shadow drifting away */
+/* like the reference: the section starts one screen early, over the ship's last (hazy) view. Its
+   white page is clipped away at first; a huge top-down jet (nose right, centred on the screen's
+   height) flies in from the left and the page follows it in behind an arrow-shaped edge that
+   hides under the wings (--clip = the jet's centre in vw, driven by the scroll, see setupPlane) */
+.testi{position:relative;z-index:4;margin-top:-220vh;margin-top:-220svh;--clip:-60}
 .plane-stage{position:sticky;top:0;height:100vh;height:100svh;margin-bottom:-100vh;margin-bottom:-100svh;z-index:6;pointer-events:none;overflow:hidden}
-.plane-stage img{position:absolute;left:0;top:0;width:100vw;height:auto;transform-origin:0 0;will-change:transform}
-.plane-stage .jet-shadow{filter:brightness(0) blur(10px);opacity:.22}
+.jet-wrap{position:absolute;left:0;top:0;width:100vw;height:100vw;transform-origin:50% 50%;will-change:transform}
+.jet-wrap img{position:absolute;left:0;top:0;width:100%;height:100%}
+.jet-wrap .jet-shadow{filter:brightness(0) blur(14px);opacity:.3;will-change:transform}
+.testi-content{position:sticky;top:0;z-index:1}
+.testi-content-inner{background:#fff;padding-bottom:120px;clip-path:polygon(0 0,calc(var(--clip)*1vw) 0,calc(var(--clip)*1vw + 8vw) 50vh,calc(var(--clip)*1vw) 100vh,calc(var(--clip)*1vw) 100%,0 100%)}
+.testi-stick{height:120vh}
 
 .testi-head{padding-top:13.5vh;padding-bottom:4vh;display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:end;background:#fff}
 .testi-head h2{font-size:clamp(30px,4.17vw,80px);line-height:1.05}
 .testi-head p{max-width:380px;justify-self:end}
 .t-row{display:grid;grid-template-columns:1fr 2fr;gap:40px;padding:60px 0;border-top:1px solid var(--line)}
-.t-who b{display:block;font-family:var(--display);font-stretch:125%;font-weight:700;text-transform:uppercase;margin-top:18px}
-.t-who span{font-size:12px;color:#777}
-.t-av{width:min(260px,100%);aspect-ratio:4/3;background:#111;color:var(--gold);display:grid;place-items:center;font-family:var(--display);font-stretch:125%;font-weight:800;font-size:64px}
+.t-who{display:flex;align-items:flex-start;gap:16px}
+.t-who b{display:block;font-family:var(--display);font-stretch:125%;font-weight:700;text-transform:uppercase;line-height:1.15}
+.t-who span{display:block;font-size:12px;color:#777;margin-top:6px}
+/* no client photos, so a small round monogram rather than a large empty tile */
+.t-av{flex:none;width:56px;height:56px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font-family:var(--display);font-stretch:125%;font-weight:700;font-size:18px;letter-spacing:.02em}
+.t-stars{margin-top:12px;color:var(--orange);font-size:14px;letter-spacing:3px}
 .t-row blockquote{font-size:clamp(20px,2vw,30px);line-height:1.25;letter-spacing:-.01em}
+.t-row blockquote{position:relative;padding-top:46px}
+.t-row blockquote::before{content:"“";position:absolute;left:-4px;top:-6px;font-family:Georgia,"Times New Roman",serif;font-weight:700;font-size:96px;line-height:1;color:var(--accent)}
 
 /* ---------- Industries grid ---------- */
-.industries{background:#fff;padding:80px 0 120px}
+/* the dark dome of the next section reaches 62vh up over this one: that much clear page is left
+   below the grid, so the dome rises over white and never over the tiles */
+.industries{background:#fff;padding:80px 0 calc(62vh + 30px)}
 .grid-label{display:grid;grid-template-columns:200px 1fr;border-top:1px dashed #cfcfcf;padding:14px 0;font-size:13px}
 .grid-label b{font-family:var(--display);font-stretch:125%;font-weight:700;text-transform:uppercase}
-.ind-grid{display:grid;grid-template-columns:repeat(3,1fr);border-left:1px dashed #cfcfcf;border-top:1px dashed #cfcfcf}
-.ind-cell{position:relative;border-right:1px dashed #cfcfcf;border-bottom:1px dashed #cfcfcf;padding:22px;display:flex;flex-direction:column;gap:16px;overflow:hidden}
-.ind-cell::before,.ind-cell::after{content:"··";position:absolute;font-size:12px;color:#aaa;line-height:1}
-.ind-cell::before{left:4px;top:2px}
-.ind-cell::after{right:4px;bottom:2px}
-.ind-cell img{width:100%;aspect-ratio:16/10;object-fit:cover;filter:grayscale(1);transition:filter .5s,transform .7s}
-.ind-cell:hover img{filter:none;transform:scale(1.04)}
-.ind-cell h3{font-family:var(--display);font-stretch:125%;font-weight:700;text-transform:uppercase;font-size:18px;line-height:1}
-.ind-cell p{font-size:13px;color:#777}
+/* bento grid: rounded tinted tiles of mixed size; the line drawings sit on the tint (multiply), the
+   tile lifts and the drawing grows on hover, an arrow chip slides in */
+.industries .grid-label{display:flex;align-items:end;justify-content:space-between;border-top:0;padding:0 0 28px}
+.industries .grid-label span{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#777;order:2}
+.industries .grid-label b{font-size:clamp(30px,4.17vw,80px);line-height:1}
+.ind-grid{display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:clamp(200px,19vw,300px);gap:14px}
+.ind-cell{position:relative;isolation:isolate;border-radius:22px;padding:22px;background:var(--t,#eef1ff);display:flex;flex-direction:column;justify-content:flex-end;gap:6px;overflow:hidden;transition:transform .5s cubic-bezier(.2,.7,.2,1),box-shadow .5s}
+.ind-cell.big{grid-column:span 2;grid-row:span 2}
+.ind-cell.wide{grid-column:span 2}
+.ind-cell img{position:absolute;z-index:-1;left:0;top:0;width:100%;height:74%;padding:30px 14px 0;object-fit:contain;mix-blend-mode:multiply;transition:transform .7s cubic-bezier(.2,.7,.2,1)}
+.ind-cell.big img{height:76%;padding:28px 28px 0}
+.ind-cell.wide img{left:auto;right:0;width:56%;height:100%;padding:14px}
+.ind-cell:hover{transform:translateY(-6px);box-shadow:0 22px 44px -22px rgba(20,24,60,.45)}
+.ind-cell:hover img{transform:scale(1.07)}
+.ind-cell h3{font-family:var(--display);font-stretch:125%;font-weight:700;text-transform:uppercase;font-size:clamp(15px,1.25vw,20px);line-height:1.05}
+.ind-cell.big h3{font-size:clamp(20px,2.1vw,34px)}
+/* the small tiles carry the name only; the line of copy shows on the large ones */
+.ind-cell p{display:none;font-size:13px;color:#555;max-width:34ch}
+.ind-cell.big p,.ind-cell.wide p{display:block}
+.ind-cell.wide h3,.ind-cell.wide p{max-width:44%}
+.ind-no{position:absolute;left:20px;top:18px;font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:#555}
+.ind-go{position:absolute;right:16px;top:14px;width:40px;height:40px;border-radius:50%;background:#111;color:#fff;display:grid;place-items:center;font-size:18px;opacity:0;transform:translate(-8px,8px);transition:opacity .35s,transform .45s cubic-bezier(.2,.7,.2,1)}
+.ind-cell:hover .ind-go{opacity:1;transform:none}
 
 /* ---------- Arc ---------- */
 .arc{position:relative;height:160vh;background:#fff;overflow:hidden;padding:0}
@@ -230,16 +328,24 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 
 /* ---------- Drives (dark) ---------- */
 .drives{background:#111;color:#fff;padding:22vh 0 140px}
-.drives-grid{display:grid;grid-template-columns:1fr 1fr;gap:60px}
-.drives-left{position:sticky;top:140px;align-self:start}
-.drives-left h2{font-size:clamp(40px,5vw,80px);margin-bottom:24px}
+/* heading across the top, then vision / mission / objective as three tall cards of equal weight:
+   a large faint number, the icon over a soft glow, the copy at the foot; the card lifts on hover */
+.drives-grid{display:block}
+.drives-left{display:grid;grid-template-columns:1fr minmax(260px,380px);column-gap:60px;align-items:end;margin-bottom:56px}
+.drives-left h2{grid-row:1/3;font-size:clamp(40px,5vw,80px)}
 .drives-left .muted{color:#555}
-.drives-left p{max-width:360px;color:#cfcfcf;margin-bottom:28px}
-.d-card{display:grid;grid-template-columns:150px 1fr;gap:24px;background:#1c1c1c;padding:16px;margin-bottom:16px;transition:background .3s}
-.d-card:hover{background:#242424}
-.d-card img{width:100%;aspect-ratio:1;object-fit:cover;background:#2a2a2a}
-.d-card .mono{color:#888;margin-bottom:12px}
-.d-card h3{font-family:var(--display);font-stretch:125%;font-weight:700;text-transform:uppercase;font-size:20px;line-height:1.05;margin-bottom:10px}
+.drives-left p{color:#cfcfcf;margin-bottom:22px}
+.drives-left .btn{justify-self:start}
+.drives-list{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;counter-reset:d}
+.d-card{position:relative;isolation:isolate;display:flex;flex-direction:column;min-height:clamp(380px,34vw,480px);padding:28px;border:1px solid #2a2a31;border-radius:22px;background:linear-gradient(180deg,#1b1b20,#131316);overflow:hidden;transition:transform .5s cubic-bezier(.2,.7,.2,1),border-color .4s}
+.d-card::before{counter-increment:d;content:"0" counter(d);position:absolute;z-index:-1;right:18px;top:0;font-family:var(--display);font-stretch:125%;font-weight:800;font-size:clamp(90px,10vw,150px);line-height:1;color:rgba(255,255,255,.05)}
+.d-card::after{content:"";position:absolute;z-index:-1;left:-22%;top:-26%;width:74%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle,rgba(59,44,255,.5),rgba(59,44,255,0) 66%);opacity:.5;transition:opacity .5s,transform .7s}
+.d-card img{width:clamp(150px,15vw,210px);aspect-ratio:1;object-fit:contain;margin:-30px 0 auto -34px;mix-blend-mode:screen;filter:hue-rotate(20deg) saturate(1.15) brightness(1.2);transition:transform .6s cubic-bezier(.2,.7,.2,1)}
+.d-card:hover{transform:translateY(-8px);border-color:rgba(122,112,255,.75)}
+.d-card:hover::after{opacity:.95;transform:scale(1.15)}
+.d-card:hover img{transform:translateY(-6px) scale(1.06)}
+.d-card .mono{color:var(--orange);margin:28px 0 12px}
+.d-card h3{font-family:var(--display);font-stretch:125%;font-weight:700;text-transform:uppercase;font-size:clamp(19px,1.7vw,26px);line-height:1.05;margin-bottom:12px}
 .d-card p{font-size:14px;color:#aaa}
 
 /* ---------- FAQ ---------- */
@@ -255,6 +361,33 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .ans{max-height:0;overflow:hidden;transition:max-height .45s ease}
 .ans p{padding:0 30px 26px 40px;color:#555;font-size:15px}
 .faq-side p{font-size:15px;margin-bottom:22px}
+/* home FAQ: heading and a dark contact card on the left, the questions as rounded cards on the
+   right; a round plus turns into a cross and the open card takes the brand tint */
+#faq .faq-grid{grid-template-columns:minmax(260px,1fr) 1.7fr;grid-template-rows:auto 1fr;grid-template-areas:"head list" "side list";column-gap:60px;row-gap:28px;align-items:start}
+#faq .faq-grid>div:first-child{grid-area:head}
+#faq .faq-grid>div:first-child p{font-size:15px;max-width:300px;color:#555}
+#faq .faq-list{grid-area:list;display:grid;gap:12px}
+#faq .faq-side{grid-area:side;background:#111;color:#fff;border-radius:22px;padding:26px;position:relative;overflow:hidden;isolation:isolate}
+#faq .faq-side::after{content:"";position:absolute;z-index:-1;right:-30%;bottom:-60%;width:90%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle,rgba(59,44,255,.6),rgba(59,44,255,0) 66%)}
+#faq .faq-side b{display:block;font-family:var(--display);font-stretch:125%;font-weight:700;text-transform:uppercase;font-size:20px;line-height:1.05;margin-bottom:10px}
+#faq .faq-side p{font-size:14px;color:#c9c9d2;margin-bottom:20px}
+.faq-cta{display:flex;flex-wrap:wrap;gap:10px}
+.faq-btn{display:inline-flex;align-items:center;height:42px;padding:0 18px;border-radius:999px;border:1px solid rgba(255,255,255,.4);font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#fff;transition:background .3s,color .3s,border-color .3s}
+.faq-btn:hover{background:#fff;color:#111;border-color:#fff}
+.faq-btn.faq-wa{background:#25d366;border-color:#25d366;color:#06240f}
+.faq-btn.faq-wa:hover{background:#fff;border-color:#fff;color:#111}
+#faq .qa{border:1px solid #ececf3;border-radius:18px;background:#f6f7fb;transition:background .35s,border-color .35s,box-shadow .35s}
+#faq .qa:hover{border-color:#d5d7ea}
+#faq .qa.open{background:#eef0ff;border-color:rgba(59,44,255,.45);box-shadow:0 18px 40px -26px rgba(59,44,255,.55)}
+#faq .qa button{grid-template-columns:44px 1fr 36px;column-gap:6px;padding:20px 20px;font-size:17px;font-weight:500}
+#faq .qa button .mono{width:34px;height:34px;border-radius:50%;background:#fff;border:1px solid #e3e4ef;display:grid;place-items:center;font-size:11px;color:#555;transition:background .35s,color .35s,border-color .35s}
+#faq .qa.open button .mono{background:var(--accent);border-color:var(--accent);color:#fff}
+#faq .qa i{position:relative;width:36px;height:36px;border:0;border-radius:50%;background:#fff;box-shadow:inset 0 0 0 1px #e3e4ef;transform:none;transition:transform .4s cubic-bezier(.2,.7,.2,1),background .35s}
+#faq .qa i::before,#faq .qa i::after{content:"";position:absolute;left:50%;top:50%;width:14px;height:2px;margin:-1px 0 0 -7px;border-radius:2px;background:#111}
+#faq .qa i::after{transform:rotate(90deg)}
+#faq .qa.open i{transform:rotate(45deg);background:var(--accent);box-shadow:none}
+#faq .qa.open i::before,#faq .qa.open i::after{background:#fff}
+#faq .ans p{padding:0 66px 24px 70px;color:#444;font-size:15px;line-height:1.55}
 .link{border-bottom:1px solid #000;padding-bottom:3px}
 
 /* ---------- CTA ---------- */
@@ -309,6 +442,78 @@ footer{background:#fff;padding-top:3vw;overflow:hidden}
 .f-credits a{color:inherit;text-decoration:underline;text-underline-offset:2px}
 .f-particles{height:clamp(110px,15vw,240px);position:relative}
 .f-particles canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+/* footer, second pass (same markup on every page): a large closing line, the three link groups
+   as cards (the quote one dark with the brand glow), the picture in colour, contact details and the
+   address block as soft panels instead of hairlines */
+footer{padding-top:6vw}
+.f-head{padding:0 0 3.2vw}
+.f-tag{font-family:var(--display);font-stretch:125%;font-weight:800;text-transform:uppercase;font-size:clamp(30px,5.2vw,96px);line-height:.98;letter-spacing:-.01em}
+.f-tag::first-line{color:#a5a5a5}
+.f-nav{grid-template-columns:1fr 1.25fr 1.25fr;gap:14px;padding:0 0 2.4vw;border-top:0}
+.f-nav>div{background:#f6f7fb;border-radius:22px;padding:24px}
+.f-nav .mono{font-size:11px;margin-bottom:16px;letter-spacing:.08em}
+.f-soc-icons{gap:8px}
+.f-soc-icons a{width:46px;height:46px;border:0;background:#111;color:#fff;font-size:11px;transition:background .3s,transform .4s cubic-bezier(.2,.7,.2,1)}
+.f-soc-icons a:hover{transform:translateY(-4px)}
+/* social links: the networks' marks instead of two-letter codes (drawn as CSS masks, so every
+   page's footer gets them without touching its markup) */
+.f-soc-icons a{position:relative;font-size:0}
+.f-soc-icons a::before{content:"";position:absolute;left:50%;top:50%;margin:-10px 0 0 -10px;width:20px;height:20px;background:currentColor;-webkit-mask:var(--ic) center/contain no-repeat;mask:var(--ic) center/contain no-repeat}
+.f-soc-icons a[href*="facebook"],.f-social a[href*="facebook"]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M13.6 21v-7.6h2.5l.4-3h-2.9V8.5c0-.9.3-1.5 1.600-1.500h1.500V4.300c-.3 0-1.200-.1-2.200-.1-2.300 0-3.800 1.400-3.800 3.900v2.300H8.200v3h2.500V21z'/%3E%3C/svg%3E")}
+.f-soc-icons a[href*="instagram"],.f-social a[href*="instagram"]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3.200' y='3.200' width='17.600' height='17.600' rx='5' fill='none' stroke='%23000' stroke-width='2'/%3E%3Ccircle cx='12' cy='12' r='4.100' fill='none' stroke='%23000' stroke-width='2'/%3E%3Ccircle cx='17.200' cy='6.800' r='1.250'/%3E%3C/svg%3E")}
+.f-soc-icons a[href*="linkedin"],.f-social a[href*="linkedin"]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='4' y='9.200' width='3.400' height='10.800'/%3E%3Ccircle cx='5.700' cy='5.600' r='2'/%3E%3Cpath d='M10 9.200h3.200v1.500c.6-1 1.800-1.800 3.500-1.800 3 0 3.800 1.900 3.800 4.700V20h-3.400v-5.700c0-1.400-.5-2.300-1.700-2.300-1.300 0-2 .9-2 2.300V20H10z'/%3E%3C/svg%3E")}
+.f-soc-icons a[href*="wa.me"]{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 3.200a8.800 8.800 0 0 0-7.600 13.200L3.200 20.800l4.500-1.200A8.800 8.800 0 1 0 12 3.200z' fill='none' stroke='%23000' stroke-width='1.900' stroke-linejoin='round'/%3E%3Cpath d='M9.300 7.900c.2-.4.400-.4.700-.4h.5c.2 0 .4 0 .6.400l.7 1.800c.1.200.1.400 0 .6l-.6.800c-.1.100-.2.300 0 .5.500.9 1.400 1.800 2.500 2.300.3.100.4.100.6-.1l.7-.8c.2-.2.400-.2.600-.1l1.700.8c.2.100.4.200.4.400 0 .5-.2 1.200-.7 1.600-.6.400-1.500.5-2.600.200-1.100-.4-2.400-1.100-3.500-2.300-1.200-1.300-1.900-2.700-2-3.600-.2-1 .1-1.800.4-2.100z'/%3E%3C/svg%3E")}
+/* the same marks for the links under the address */
+.f-social a{position:relative;width:46px;height:46px;padding:0;border:0;border-radius:50%;background:#111;color:#fff;font-size:0;transition:background .3s,transform .4s cubic-bezier(.2,.7,.2,1)}
+.f-social a::before{content:"";position:absolute;left:50%;top:50%;margin:-10px 0 0 -10px;width:20px;height:20px;background:currentColor;-webkit-mask:var(--ic) center/contain no-repeat;mask:var(--ic) center/contain no-repeat}
+.f-social a:hover{transform:translateY(-4px)}
+/* Instagram carries its follower count (written in by setupSocialProof): a wide button on its own
+   row, the other three networks under it */
+.f-soc-icons{flex-wrap:wrap}
+.f-soc-icons a.ig-wide{order:-1;flex:0 0 100%;width:auto;height:54px;border-radius:999px;display:flex;align-items:center;gap:7px;padding:0 18px 0 48px;background:radial-gradient(circle at 12% 120%,#fdf497 0%,#fd5949 40%,#d6249f 62%,#285aeb 95%)}
+.f-soc-icons a.ig-wide::before{left:16px;margin:-11px 0 0;width:22px;height:22px}
+.f-soc-icons a.ig-wide b{font-family:var(--display);font-stretch:125%;font-weight:800;font-size:18px;letter-spacing:0}
+.f-soc-icons a.ig-wide i{white-space:nowrap;font-style:normal;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+.f-soc-icons a.ig-wide u{margin-left:auto;white-space:nowrap;text-decoration:none;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;opacity:.9}
+.f-soc-icons a.ig-wide.no-count b,.f-soc-icons a.ig-wide.no-count i{display:none}
+/* proof line under the testimonials heading */
+.testi-trust{display:flex;flex-wrap:wrap;gap:10px;padding-bottom:5vh;background:#fff}
+.ig-proof,.star-proof{display:inline-flex;align-items:center;gap:9px;height:44px;padding:0 18px;border:1px solid #e3e4ef;border-radius:999px;font-size:14px;background:#fff;transition:border-color .3s,box-shadow .3s,transform .4s cubic-bezier(.2,.7,.2,1)}
+.ig-proof b{font-family:var(--display);font-stretch:125%;font-weight:800;font-size:16px}
+.ig-proof em{font-style:normal;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-left:4px}
+.ig-proof:hover{border-color:#d6249f;box-shadow:0 14px 30px -18px rgba(214,36,159,.7);transform:translateY(-3px)}
+.ig-proof.no-count b{display:none}
+:root{--ic-ig:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3.200' y='3.200' width='17.600' height='17.600' rx='5' fill='none' stroke='%23000' stroke-width='2'/%3E%3Ccircle cx='12' cy='12' r='4.100' fill='none' stroke='%23000' stroke-width='2'/%3E%3Ccircle cx='17.200' cy='6.800' r='1.250'/%3E%3C/svg%3E")}
+.ig-dot{width:22px;height:22px;border-radius:7px;background:radial-gradient(circle at 30% 110%,#fdf497 0%,#fd5949 45%,#d6249f 62%,#285aeb 92%);position:relative}
+.ig-dot::before{content:"";position:absolute;inset:4px;background:#fff;-webkit-mask:var(--ic-ig) center/contain no-repeat;mask:var(--ic-ig) center/contain no-repeat}
+.star-proof span{color:var(--orange);letter-spacing:2px;font-size:13px}
+/* each network in its own colour on hover */
+.f-soc-icons a[href*="facebook"]:hover,.f-social a[href*="facebook"]:hover{background:#1877f2;border-color:#1877f2;color:#fff}
+.f-soc-icons a[href*="instagram"]:hover,.f-social a[href*="instagram"]:hover{background:radial-gradient(circle at 30% 110%,#fdf497 0%,#fd5949 45%,#d6249f 62%,#285aeb 92%);border-color:transparent;color:#fff}
+.f-soc-icons a[href*="linkedin"]:hover,.f-social a[href*="linkedin"]:hover{background:#0a66c2;border-color:#0a66c2;color:#fff}
+.f-soc-icons a[href*="wa.me"]:hover{background:#25d366;color:#fff}
+.f-menu{columns:2;font-size:clamp(15px,1.25vw,19px);font-weight:600;line-height:2.05}
+.f-menu a{display:inline-block;transition:color .3s,transform .4s cubic-bezier(.2,.7,.2,1)}
+.f-menu a:hover{transform:translateX(6px)}
+.f-nav>div:last-child{position:relative;isolation:isolate;overflow:hidden;background:#111;color:#fff}
+.f-nav>div:last-child::after{content:"";position:absolute;z-index:-1;right:-25%;bottom:-70%;width:85%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle,rgba(59,44,255,.65),rgba(59,44,255,0) 66%)}
+.f-nav>div:last-child .mono{color:#9a9aa5}
+.f-nav .f-quote{font-size:clamp(15px,1.25vw,19px);color:#fff;max-width:340px;margin-bottom:20px}
+.f-nav .f-dir{display:inline-flex;align-items:center;height:44px;padding:0 20px;border-radius:999px;background:var(--accent);color:#fff;text-decoration:none;font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;transition:background .3s,color .3s}
+.f-nav .f-dir:hover{background:#fff;color:#111}
+.f-tabs{border-top:0}
+.f-track{color:#111;font-weight:700}
+.f-track span:nth-child(even){color:transparent;-webkit-text-stroke:1px #111}
+.f-top{gap:14px;align-items:stretch;padding-bottom:14px}
+.f-img{width:100%;height:100%;min-height:260px;aspect-ratio:auto;border-radius:22px;filter:none}
+.f-contact{gap:14px;justify-content:space-between}
+.f-contact>div{flex:1;display:flex;flex-direction:column;justify-content:center;background:#f6f7fb;border-radius:18px;padding:18px 24px}
+.f-contact a{transition:color .3s}
+.f-contact a:hover{color:var(--accent)}
+.f-mid{background:#f6f7fb;border-radius:22px;padding:30px;margin-bottom:34px}
+.f-dir{text-underline-offset:3px}
+.f-social{gap:8px;margin-top:26px}
+@media (max-width:900px){.f-nav{grid-template-columns:1fr}.f-top{grid-template-columns:1fr}.f-mid{padding:22px}}
 
 /* ---------- WhatsApp ---------- */
 .wa{position:fixed;right:20px;bottom:20px;z-index:90;width:54px;height:54px;border-radius:50%;background:#25d366;display:grid;place-items:center;box-shadow:0 10px 30px rgba(0,0,0,.25);transition:transform .3s}
@@ -321,13 +526,15 @@ footer{background:#fff;padding-top:3vw;overflow:hidden}
   .top-links{display:none}
   .bar{gap:20px}
   .menu-panel{left:var(--pad);right:var(--pad);width:auto}
-  .hero-globe{right:-40vw;width:150vw;height:62%;top:8%}
+  .hero-globe{left:auto;bottom:auto;right:-40vw;width:150vw;height:62%;top:8%}
   .hero-copy{right:var(--pad);bottom:8vh}
   .intro-grid,.drives-grid,.f-top,.f-mid,.testi-head{grid-template-columns:1fr}
   .intro-left,.drives-left{position:static}
-  .intro-title{max-width:none}.intro-left{padding-top:0}.intro-img{width:60%}.intro-grid{row-gap:28px}
-  .intro-img{margin-bottom:40px}
+  .drives-left{display:block;margin-bottom:36px}.drives-left h2{margin-bottom:20px}.drives-list{grid-template-columns:1fr}.d-card{min-height:0}.d-card img{margin-bottom:0}
+  .intro-title{max-width:none}.intro-left{padding-top:0}.intro-media{width:70%}.intro-grid{row-gap:28px}
+  .intro-media{margin-bottom:40px}
   .faq-grid{grid-template-columns:1fr}
+  #faq .faq-grid{grid-template-columns:1fr;grid-template-areas:"head" "list" "side"}#faq .ans p{padding:0 20px 22px 20px}
   .j-panel{top:40%}
   .j-panel-head{grid-template-columns:1fr;gap:10px}
   .j-panel-copy p:last-child{display:none}
@@ -336,13 +543,13 @@ footer{background:#fff;padding-top:3vw;overflow:hidden}
   .j-feat{background:rgba(255,255,255,.9);padding:12px}
   .why-cards{grid-template-columns:1fr;margin-top:40vh;row-gap:10vh}.why-card,.why-card:last-child{width:auto;text-align:center!important;grid-column:auto}
   .t-row{grid-template-columns:1fr;gap:20px}
-  .t-av{width:140px;font-size:40px}
+  .t-av{width:48px;height:48px;font-size:16px}
   .testi-head p{justify-self:start}
-  .ind-grid{grid-template-columns:repeat(2,1fr)}
+  .ind-grid{grid-template-columns:repeat(2,1fr);grid-auto-rows:clamp(200px,44vw,320px)}.ind-cell.big{grid-row:span 1}.ind-cell.big img{height:66%;padding:16px 16px 0}
   .d-card{grid-template-columns:90px 1fr}
 }
 @media (max-width:560px){
-  .ind-grid{grid-template-columns:1fr}
+  .ind-grid{grid-template-columns:1fr;grid-auto-rows:240px}.ind-cell.big,.ind-cell.wide{grid-column:auto}.ind-cell.wide img{width:100%;height:66%;left:0;padding:16px 16px 0}.ind-cell.wide h3,.ind-cell.wide p{max-width:none}
   .pill{display:none}
   .menu-btn{margin-left:auto}
 }
@@ -572,3 +779,226 @@ footer{background:#fff;padding-top:3vw;overflow:hidden}
   background:linear-gradient(rgba(17,17,17,0) 50%,#111 50%),radial-gradient(closest-side,#111 0,#111 70%,#1d1470 77%,#3a2ae0 83%,#7a6bff 88%,rgba(160,150,255,.6) 93%,rgba(215,210,255,.25) 97%,rgba(255,255,255,0) 100%)}
 @media (max-width:900px){.svc-intro-row{grid-template-columns:1fr 1fr}.svc-intro-row p{grid-column:1/-1}.svc-intro h2{max-width:none}}
 @media (max-width:900px){.c-grid{grid-template-columns:1fr}.c-left,.c-right{position:static}.c-info{flex-direction:row;flex-wrap:wrap}}
+
+/* ---------- Phones: journey and ship text (as the reference lays them out there) ---------- */
+@media (max-width:759px){
+  /* reliability: a dark panel on the right, the truck on a strip to its left; one scrolling column */
+  .j-rel{left:27vw;background:#111;color:#fff;will-change:transform}
+  .j-panel{display:none}
+  .j-col{padding:0 var(--pad) 0 4vw;will-change:transform}
+  /* the column passes under the header: it fades out there instead of running through the menu */
+  .j-rel::before{content:"";position:absolute;left:0;right:0;top:0;height:130px;z-index:1;background:linear-gradient(#111 60%,rgba(17,17,17,0))}
+  .j-col .j-panel-head{display:block;padding:0;max-width:none}
+  .j-col .j-panel-head h2{font-size:26px;line-height:1.05;margin-bottom:18px}
+  .j-col .j-panel-copy p,.j-col .j-panel-copy p:last-child{display:block;font-size:13px;max-width:none;margin-bottom:12px}
+  .j-col .j-cards{display:block;margin:36px 0 70px;padding:0}
+  .j-col .j-card{width:auto;padding:0 0 24px;margin:0 0 24px;border-right:0;border-bottom:1px solid #2c2c2c}
+  .j-col .j-card svg{width:40px;height:40px;margin-bottom:14px}
+  .j-col .j-card h3{font-size:18px;margin-bottom:8px}
+  .j-col .j-card p{font-size:13px}
+  .j-rel-left,.j-rel-right{position:static;width:auto}
+  .j-rel-left h2{position:static;max-width:none;font-size:26px;margin-bottom:18px}
+  .j-rel-left h2 .muted{color:#707070}
+  .j-rel-left p{position:static;max-width:none;background:none;padding:0;font-size:13px;color:#e8e8e8;margin-bottom:44px}
+  .j-feat{position:static;background:none;padding:0 0 26px;margin-bottom:26px;border-bottom:1px solid #2c2c2c}
+  .j-feat:last-child{border-bottom:0}
+  .j-feat svg{stroke:#fff}
+  .j-feat p{font-size:13px;color:#a8a8a8}
+  /* ship: text kept clear of the screen edges */
+  .why-title{width:auto;min-width:0;padding:0 var(--pad)}
+  .why-cards{padding:0 var(--pad)}
+  .why-card p{max-width:74vw;margin:0 auto}
+}
+
+/* ---------- Phones: the reference's own type scale there (measured at 375 px: side gutter 15,
+   h1 45.8, section headings 34.35/36, figures 91.6, item titles 15.3, body 15.3/19.8, quotes 17.2/20.6) ---------- */
+@media (max-width:759px){
+  :root{--pad:4vw}
+  .hero-copy h1{font-size:12.2vw;line-height:1.05}
+  .hero-copy p{font-size:15px;line-height:1.3;max-width:78vw}
+  .intro-title,.testi-head h2,.why-title h2,.drives-left h2,#faq h2,.cta h2,.j-rel-left h2,.j-col .j-panel-head h2{font-size:9.16vw;line-height:1.05}
+  .intro-media{width:100%}
+  .stat .num{font-size:24.4vw;line-height:1.05}
+  .stat .lbl{font-size:16px;margin-top:6px}
+  .stat{padding-bottom:9vw;margin-bottom:7vw}
+  .j-rel{left:24vw}
+  .j-col{padding-left:4vw}
+  .j-col .j-card h3,.j-feat h3,.why-card h3{font-size:15.3px;line-height:1.2}
+  .j-col .j-card p,.j-feat p,.j-rel-left p,.j-col .j-panel-copy p,.j-col .j-panel-copy p:last-child{font-size:14px;line-height:1.3}
+  .why-card p{font-size:14px;line-height:1.3;max-width:64vw}
+  .why-card svg{width:34px;height:34px}
+  .why-title h2 br{display:none}.why-title{padding:0 9vw}
+  .t-row blockquote{font-size:17.2px;line-height:1.2}
+  #faq .qa button{font-size:15.3px;padding:16px 14px;grid-template-columns:34px 1fr 32px}
+}
+
+/* ---------- Phones: the jet flies up the screen and the white page is drawn in below it (see setupPlane) ---------- */
+@media (max-width:759px){
+  .testi-content{position:relative}
+  .testi-stick{height:0}
+  .testi-content-inner{clip-path:inset(calc(var(--edge,0)*1px) 0 0 0)}
+  .testi-head{padding-top:82.3vh;padding-top:82.3svh}
+}
+
+/* ---------- Phones: header and hero as the reference has them at 375x812 (px there / 3.75 = vw here):
+   top strip 32 high in 8.6 px type at 60% white; bar 47; menu = four dots + bold word; globe box = the
+   whole screen (the scene places the disc); label 466 from the top in 15.3 px bold, heading 45.8/48,
+   30 px to the text (15.3/18.3 at 70% white), 24 px to the buttons (36 high, 9.5 px type, 8 px apart),
+   30.5 px left under them ---------- */
+@media (max-width:759px){
+  .topbar{height:8.53vw}
+  .ticker{font-size:2.3vw;color:rgba(255,255,255,.6)}
+  .site-head[data-theme="light"] .ticker{color:rgba(17,17,17,.6)}
+  .bar{height:12.5vw}
+  .logo{height:7.5vw;width:18.75vw}
+  .site-head:not(.at-top) .logo{width:5.4vw}
+  .menu-btn{font-family:var(--mono);font-weight:400;font-size:3.2vw;gap:8px}
+  .menu-btn .dots{gap:2px}
+  .menu-btn .dots b{width:4px;height:4px}
+  .menu-btn .dots::before{content:"";width:4px;height:4px;border-radius:50%;background:currentColor;opacity:.35}
+  .menu-btn .dots b:first-child{opacity:.6}
+  .hero-globe{left:0;right:0;top:0;bottom:0;width:auto;height:auto}
+  .hero-copy{left:4vw;right:4vw;bottom:8.14vw}
+  .kicker{font-size:4.07vw;font-weight:700;line-height:1.2;margin-bottom:2.13vw}
+  .hero-copy h1{font-size:12.21vw;line-height:1.05}
+  .hero-copy p{margin:8vw 0 6.4vw;font-size:4.07vw;line-height:1.2;color:rgba(255,255,255,.7);max-width:84vw}
+  .hero-copy .cta-row{gap:2.13vw}
+  .hero-copy .btn{height:9.6vw;padding:0 5.09vw;font-size:2.54vw}
+}
+
+/* ---------- Phones: intro in the reference's order and measures there (375 wide): text 19.1/22.9 medium,
+   30 px, button (36 high), 62 px, heading 34.35/36, 31 px, picture 344x219, 75 px, caption 15.3 with a
+   rule 16 px under it, then each figure 40 px down, 91.6/96, 16 px, label 22.9/25.2 at 72%, 40 px, rule ---------- */
+@media (max-width:759px){
+  .intro-grid{row-gap:0}
+  .intro-left,.intro-right{display:contents}
+  .intro .reveal-text{order:1;font-size:5.09vw;line-height:1.2;margin:0}
+  .intro .intro-right>.btn{order:2;justify-self:start;margin-top:8vw;height:9.6vw;padding:0 5.09vw;font-size:2.54vw}
+  .intro-title{order:3;margin-top:16.5vw}
+  .intro-media{order:4;width:100%;min-width:0;aspect-ratio:344/219;margin:8.27vw 0 0}
+  .stats{order:5;margin-top:20vw}
+  .stats-cap{font-size:4.07vw;line-height:1.2;padding-bottom:4.27vw;margin-bottom:0}
+  .stat{padding:10.67vw 0;margin-bottom:0}
+  .stat .num{font-size:24.43vw;line-height:1.05}
+  .stat .lbl{margin-top:4.27vw;font-size:6.1vw;line-height:1.1;color:rgba(17,17,17,.72)}
+  .intro{padding-bottom:20.5vw}
+}
+
+/* ---------- Phones: the services / reliability column in the reference's measures there (375 wide):
+   text from 105 px to 15 px short of the right edge; heading 34.35/36 with its second part at 24% white,
+   46 px under it; text 13.4/17.4 at 70% white, 239 wide, 38 px under it; each item: 38 px icon, 30.5 px
+   (19 in the second list), title 15.3/18.3 bold, 11.5 px (19), text at 60% (70%), 30.5 px, hairline at 8%
+   white, 30.5 px; 91 px between the two blocks ---------- */
+@media (max-width:759px){
+  .j-rel{left:24vw}
+  .j-col{padding:0 4vw 0 4vw}
+  .j-col .j-panel-head h2,.j-rel-left h2{font-size:9.16vw;line-height:1.05;margin-bottom:12.2vw}
+  .j-col .j-panel-head .muted,.j-rel-left h2 .muted{color:rgba(255,255,255,.24)}
+  .j-col .j-panel-copy{margin-bottom:10.18vw}
+  .j-col .j-panel-copy p,.j-col .j-panel-copy p:last-child,.j-rel-left p{font-size:3.56vw;line-height:1.3;color:rgba(255,255,255,.7);max-width:63.7vw;margin:0}
+  .j-rel-left p{margin-bottom:10.18vw}
+  .j-col .j-cards{margin:0 0 24.3vw}
+  .j-col .j-card,.j-feat{padding:0 0 8.14vw;margin:0 0 8.14vw;border-bottom:1px solid rgba(255,255,255,.08)}
+  .j-col .j-card:last-child{margin-bottom:0}
+  .j-feat:last-child{border-bottom:0}
+  .j-col .j-card svg,.j-feat svg{display:block;width:10.13vw;height:10.13vw;margin-bottom:8.14vw}
+  .j-feat svg{margin-bottom:5.09vw}
+  .j-col .j-card h3,.j-feat h3{font-size:4.07vw;line-height:1.2;margin-bottom:3.05vw}
+  .j-feat h3{margin-bottom:5.09vw}
+  .j-col .j-card h3 br,.j-feat h3 br{display:none}
+  .j-col .j-card p{font-size:3.56vw;line-height:1.3;color:rgba(255,255,255,.6)}
+  .j-feat p{font-size:3.56vw;line-height:1.3;color:rgba(255,255,255,.7)}
+  /* new staging only: the big section word, faint, low on the screen, sliding left with the scroll */
+  .journey.mob-new .j-giant{top:auto;bottom:25.4vw;font-size:55.4vw;line-height:.7;transform:translateX(4vw);color:rgba(255,255,255,.06);z-index:0}
+}
+
+/* new phone staging: the page is already dark behind the text column (no panel), and the big word is
+   146 px tall at 375 wide */
+@media (max-width:759px){
+  .journey.mob-new .j-rel{background:transparent}
+  .journey.mob-new .j-rel::before{display:none}
+  .journey.mob-new .j-speed{display:none}
+}
+
+/* ---------- Icons as the reference draws them: a 14 x 14 grid of dots, the icon lit, the rest faint ---------- */
+.j-card svg,.j-feat svg,.why-card svg{stroke-width:7;stroke-linecap:round;stroke-linejoin:round;
+  -webkit-mask:radial-gradient(circle at center,#000 50%,transparent 60%) 0 0/7.143% 7.143%;mask:radial-gradient(circle at center,#000 50%,transparent 60%) 0 0/7.143% 7.143%;
+  background:radial-gradient(circle at center,rgba(140,140,140,.2) 40%,transparent 50%) 0 0/7.143% 7.143%}
+
+/* ---------- Hero text painted in (see paintIn): --g = how far along its line the fill has come, in % ---------- */
+.paint{color:transparent;-webkit-text-fill-color:transparent;-webkit-background-clip:text;background-clip:text;background-repeat:no-repeat;
+  background-image:linear-gradient(90deg,var(--pc,#fff) calc(var(--g,130)*1% - 30%),var(--accent) calc(var(--g,130)*1% - 3%),rgba(59,44,255,0) calc(var(--g,130)*1%));
+  background-size:var(--lw,100%) 100%;background-position:calc(-1*var(--wx,0px)) 0}
+@media (max-width:759px){img.pl-page-logo{height:64px}}
+
+/* ---------- Phones: industries as a compact two-column grid (every card kept, about a third of the
+   scrolling): the two feature cards run full width with the picture on the right, the rest sit two a row ---------- */
+@media (max-width:560px){
+  .ind-grid{grid-template-columns:repeat(2,1fr);grid-auto-rows:44vw;gap:10px}
+  .ind-cell{padding:14px;border-radius:16px;gap:4px}
+  .ind-cell img{height:66%;padding:14px 10px 0}
+  .ind-cell h3{font-size:13px}
+  .ind-cell.big,.ind-cell.wide{grid-column:span 2;grid-row:span 1}
+  .ind-cell.big img,.ind-cell.wide img{left:auto;right:0;top:0;width:50%;height:100%;padding:12px}
+  .ind-cell.big h3,.ind-cell.wide h3{font-size:17px;max-width:48%}
+  .ind-cell.big p,.ind-cell.wide p{max-width:48%;font-size:12px;line-height:1.3}
+  .industries{padding-top:15vw}
+}
+
+/* ---------- Phones: the dome between industries and "what drives us" made much shallower (it stood
+   62vh tall and nearly flat across a narrow screen, leaving a long empty stretch) ---------- */
+@media (max-width:759px){
+  .horizon::before{top:-20vh;width:160vw;height:40vh;margin-left:-80vw}
+  .industries{padding-bottom:calc(22vh + 16px)}
+  .drives{padding-top:14vw}
+}
+
+/* ---------- Phones: "what drives us" cards as compact rows (icon left, text right) ---------- */
+@media (max-width:759px){
+  .drives{padding-bottom:20vw}
+  .drives-left{margin-bottom:26px}
+  .d-card{flex-direction:row;align-items:flex-start;gap:14px;padding:18px 18px 20px;min-height:0}
+  .d-card img{width:96px;height:96px;flex:none;margin:-16px -10px 0 -18px}
+  .d-card h3{font-size:16px;line-height:1.1}
+  .d-card p{font-size:13px;line-height:1.35}
+}
+
+/* policy pages (privacy / terms / shipping): contents list on the left, text on the right */
+.legal{background:#fff;color:#111;padding:clamp(150px,12vw,230px) 0 clamp(80px,9vw,150px)}
+.legal-grid{display:grid;grid-template-columns:18vw 1fr;gap:6vw;align-items:start}
+.legal-toc{position:sticky;top:130px;margin-top:clamp(120px,11vw,200px)}
+.legal-toc .mono{display:block;font-family:var(--display);font-weight:700;font-size:15px;letter-spacing:0;margin-bottom:14px}
+.legal-toc a{display:flex;justify-content:space-between;gap:12px;padding:9px 12px;font-family:var(--mono);font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#555;border-bottom:1px solid #e6e6e6;transition:background .3s,color .3s}
+.legal-toc a i{font-style:normal;opacity:.6}
+.legal-toc a:hover{color:#000}
+.legal-toc a.on{background:#111;color:#fff}
+.legal-body{max-width:1100px}
+.legal-back{display:inline-block;color:#777;margin-bottom:22px}
+.legal-back:hover{color:#000}
+.legal-title{font-size:clamp(36px,3.6vw,64px);line-height:1}
+.legal-date{color:#888;margin:14px 0 clamp(36px,4vw,64px)}
+.legal-sec{padding:clamp(26px,2.6vw,40px) 0;border-top:1px solid #e6e6e6;scroll-margin-top:110px}
+.legal-sec h2{font-size:clamp(20px,1.9vw,30px);line-height:1.05;margin-bottom:16px}
+.legal-sec p,.legal-sec li{font-size:clamp(14px,1.05vw,17px);line-height:1.55;color:rgba(17,17,17,.86)}
+.legal-sec p+p,.legal-sec ul+p,.legal-sec p+ul{margin-top:12px}
+.legal-sec ul{list-style:none}
+.legal-sec li{position:relative;padding-left:18px;margin-top:8px}
+.legal-sec li::before{content:"";position:absolute;left:0;top:.62em;width:6px;height:6px;background:var(--accent)}
+.legal-sec a{text-decoration:underline;text-underline-offset:3px}
+.legal-cta{height:auto;min-height:0;padding:clamp(90px,12vw,170px) 0}
+.menu-panel .menu-cta{display:flex;align-items:center;justify-content:center;height:42px;margin:18px 0 6px;border-radius:999px;background:#fff;color:#000;font-size:12px;text-transform:uppercase;transition:background .3s,color .3s}
+.menu-panel .menu-cta:hover{background:var(--accent);color:#fff}
+@media (max-width:759px){
+  .legal{padding:34vw 0 16vw}
+  .legal-grid{grid-template-columns:1fr;gap:0}
+  .legal-toc{position:static;margin:0 0 8vw;order:2}
+  .legal-body{display:contents}
+  .legal-back,.legal-title,.legal-date{order:1}
+  .legal-sec{order:3}
+  .legal-grid{display:flex;flex-direction:column;align-items:stretch}
+  .legal-date{margin-bottom:8vw}
+  .legal-sec p,.legal-sec li{font-size:3.9vw}
+  .menu-btn{position:relative}
+  .menu-btn::after{content:"";position:absolute;inset:-12px -10px}
+  .f-links a{padding:8px 0}
+}

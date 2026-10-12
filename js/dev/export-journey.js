@@ -7,7 +7,11 @@ import * as THREE from 'three';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-const tick = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+// one scene update: two animation frames, or - when the tab is hidden and frames do not fire - the
+// scene's own step, called by hand
+const tick = () => (document.hidden && window.__journey.step
+  ? new Promise((r) => { window.__journey.step(); setTimeout(r, 0); })
+  : new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
 
 async function put(path, body) {
   const r = await fetch(path, { method: 'PUT', body });
@@ -30,6 +34,7 @@ export async function exportJourney({ frames = 240, pEnd = 0.5 } = {}) {
     const mesh = new THREE.Mesh(mergeGeometries(geos, false), o.material);
     mesh.position.copy(o.position); mesh.quaternion.copy(o.quaternion); mesh.scale.copy(o.scale);
     mesh.castShadow = o.castShadow;
+    mesh.visible = o.visible;            // switched-off parts (the built stacker under the scan) stay off
     o.parent.add(mesh);
     o.parent.remove(o);
   });
@@ -42,7 +47,10 @@ export async function exportJourney({ frames = 240, pEnd = 0.5 } = {}) {
   scene.traverse((o) => { if (o !== scene) { o.name = `N${nodes.length}`; nodes.push(o); } });
 
   const sample = (p) => { J.inspect(p); };
-  const pose = () => nodes.map((o) => [o.position.x, o.position.y, o.position.z, o.quaternion.x, o.quaternion.y, o.quaternion.z, o.quaternion.w, o.scale.x, o.scale.y, o.scale.z, o.visible ? 1 : 0]);
+  // visibility as seen: a node shows only if it and every ancestor do (Blender keys each mover on its
+  // own, so a spinning wheel disc under a hidden truck would otherwise render)
+  const shown = (o) => { for (let p = o; p && p !== scene; p = p.parent) if (!p.visible) return false; return true; };
+  const pose = () => nodes.map((o) => [o.position.x, o.position.y, o.position.z, o.quaternion.x, o.quaternion.y, o.quaternion.z, o.quaternion.w, o.scale.x, o.scale.y, o.scale.z, shown(o) ? 1 : 0]);
 
   // which nodes move or toggle at all over the range (coarse pass)
   sample(0); await tick(); await tick();
@@ -71,5 +79,8 @@ export async function exportJourney({ frames = 240, pEnd = 0.5 } = {}) {
   const glb = await new GLTFExporter().parseAsync(scene, { binary: true, onlyVisible: false, maxTextureSize: 2048 });
   await put('/_export/journey.glb', glb);
   await put('/_export/journey_anim.json', JSON.stringify(anim));
+  // what is switched off at the start (the render hides these with everything under them); written
+  // with every export, since the node numbering changes whenever the scene does
+  await put('/_export/journey_hidden.json', JSON.stringify(nodes.filter((o) => !o.visible).map((o) => o.name)));
   return { nodes: nodes.length, animated: ids.length, frames, glbBytes: glb.byteLength };
 }

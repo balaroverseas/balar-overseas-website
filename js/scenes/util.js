@@ -48,6 +48,26 @@ export function upgradeTruck(truck) {
         if (!o.material.map) o.material.color.set('#1a1a1a');
       }
     });
+    // The Cycles render of the port phase lights this same truck with a warm sun, and its dark steel
+    // comes out brown-black there (trailer frame 99,88,78 against 91,94,99 here; cab 39,35,34 against
+    // 30,32,37 — read off the last rendered frame beside this scene). The page's light is cooler, so
+    // the paint itself is warmed to meet it and nothing changes colour at the hand-over. Not for the
+    // render's own export (?hq), which must keep the real paint.
+    if (!new URLSearchParams(location.search).has('hq')) {
+      const WARM = [[/^paint_yellow|^plastic_black|^Material\.001$|^Back_Trailor$/, [1.6, 0.95, 0.45]], [/^Grey$|^dark$|^Darker_Most$/, [1.5, 1.15, 0.85]]];
+      const done = new Map();
+      model.traverse((o) => {
+        if (!o.isMesh) return;
+        const hit = WARM.find(([re]) => re.test(o.material.name));
+        if (!hit) return;
+        if (!done.has(o.material.uuid)) {
+          const m = o.material.clone();
+          m.color.r *= hit[1][0]; m.color.g *= hit[1][1]; m.color.b *= hit[1][2];
+          done.set(o.material.uuid, m);
+        }
+        o.material = done.get(o.material.uuid);
+      });
+    }
     truck.children.slice().forEach((c) => { if (!c.userData.keep) truck.remove(c); });
     truck.add(model);
     addWheelFaces(model, wheels);

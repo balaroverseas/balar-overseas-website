@@ -80,11 +80,32 @@ function textPlane(text, w, h, { color = '#ffffff', weight = 800, px = 150 } = {
   });
   return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.5, metalness: 0.1, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
 }
+// The company logo as a decal: `h` metres tall, as wide as the picture's own proportions make it.
+const LOGO_ASPECT = 649 / 260;
+function logoPlane(src, h) {
+  const tex = new THREE.TextureLoader().load(src);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  // on the page the logo keeps its own colours whatever the light (as it does in the render, where
+  // it is flat ink); for the render's export it stays an ordinary lit decal
+  const hq = new URLSearchParams(location.search).has('hq');
+  const opts = { map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 };
+  const mat = hq ? new THREE.MeshStandardMaterial({ ...opts, roughness: 0.5, metalness: 0.1 }) : new THREE.MeshBasicMaterial({ ...opts, toneMapped: false });
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(h * LOGO_ASPECT, h), mat);
+  if (hq) return plane;
+  // drawn small, the thin strokes thin out to grey: a second pass over the first gives them back
+  // their weight (the render's logo, at the hand-over, is full black and red)
+  const g = new THREE.Group(), again = plane.clone();
+  again.position.z = 0.002;
+  g.add(plane, again);
+  return g;
+}
+const sideMark = (label, color, logo, L, H) => (logo ? logoPlane(logo, H * 0.56) : textPlane(label, Math.min(6.4, L * 0.72), 0.75, { color, px: 96 }));
 
 // ------------------------------------------------------------------ 40 ft container with real ribs
 // (40 ft: same length as the skeletal trailer it is loaded onto)
 export const CONT = { L: 12.192, W: 2.438, H: 2.591 };
-export function buildRibbedContainer(color = '#b4372c', label = 'BALAR OVERSEAS', labelColor = '#ffffff') {
+export function buildRibbedContainer(color = '#b4372c', label = 'BALAR OVERSEAS', labelColor = '#ffffff', logo = '') {
   const g = new THREE.Group();
   const add = adder(g);
   const paint = new THREE.MeshStandardMaterial({ color, metalness: 0.35, roughness: 0.55 });
@@ -124,8 +145,8 @@ export function buildRibbedContainer(color = '#b4372c', label = 'BALAR OVERSEAS'
   });
   [-1, 1].forEach((sx) => [0.5, 1.3, 2.1].forEach((y) => add(B(0.06, 0.12, 0.05), casting, sx * (W / 2 - 0.02), y, L / 2 + 0.02)));
   if (label) {
-    const t = textPlane(label, Math.min(6.4, L * 0.72), 0.75, { color: labelColor, px: 96 });
-    t.position.set(W / 2 + 0.035, H * 0.62, -L * 0.08);
+    const t = sideMark(label, labelColor, logo, L, H);
+    t.position.set(W / 2 + 0.035, logo ? H * 0.5 : H * 0.62, -L * 0.08);
     t.rotation.y = Math.PI / 2;
     g.add(t);
     const t2 = t.clone();
@@ -142,47 +163,46 @@ function doorMarkings(number, iso, ink = '#1f2329') {
   const W = 1024, H = Math.round(1024 * CONT.H / CONT.W);
   const tex = canvasTex(W, H, (g) => {
     g.clearRect(0, 0, W, H);
-    g.fillStyle = ink;
     g.textBaseline = 'top';
-    // owner code + serial + boxed check digit, top right, with the size/type code under it
-    const [owner, serial, check] = number.split(' ');
-    g.font = '700 58px Arial, sans-serif';
-    const t1 = `${owner} ${serial}`;
-    const w1 = g.measureText(t1).width;
-    const x1 = W - 70 - w1 - 56;
-    g.fillText(t1, x1, 70);
-    g.lineWidth = 5; g.strokeStyle = ink; g.strokeRect(W - 70 - 46, 64, 46, 64);
-    g.fillText(check, W - 70 - 38, 70);
-    g.font = '700 50px Arial, sans-serif';
-    g.fillText(iso, W - 70 - g.measureText(iso).width, 146);
-    // weight panel, left door
-    g.font = '600 25px Arial, sans-serif';
-    const rows = [['MAX. GROSS', '30,480 KG', '67,200 LB'], ['TARE', '3,750 KG', '8,270 LB'], ['NET', '26,730 KG', '58,930 LB'], ['CU. CAP.', '67.7 CU.M', '2,390 CU.FT']];
-    rows.forEach(([k, a, b], i) => {
-      const y = 330 + i * 40;
-      g.fillText(k, 70, y); g.fillText(a, 250, y); g.fillText(b, 390, y);
+    // Kept as plain as a working box's doors are (the reference's are): black rubber seals round
+    // each door, hazard tape on the top corners, the number and weights small on the right door,
+    // two small stickers and one data plate on the left. Nothing large, nothing bright.
+    g.strokeStyle = 'rgba(16,18,21,0.9)'; g.lineWidth = 9;
+    g.strokeRect(26, 40, W / 2 - 34, H - 96);
+    g.strokeRect(W / 2 + 8, 40, W / 2 - 34, H - 96);
+    [[40, 150], [W - 190, 150]].forEach(([x, w]) => {
+      g.save();
+      g.beginPath(); g.rect(x, 8, w, 22); g.clip();
+      g.fillStyle = '#d9a514'; g.fillRect(x, 8, w, 22);
+      g.fillStyle = '#17181a';
+      for (let k = -30; k < w + 30; k += 30) { g.beginPath(); g.moveTo(x + k, 30); g.lineTo(x + k + 14, 30); g.lineTo(x + k + 36, 8); g.lineTo(x + k + 22, 8); g.fill(); }
+      g.restore();
     });
-    // CSC safety approval plate (stamped metal) + customs plate, left door, lower
-    const plate = (x, y, w, h, lines) => {
-      const gr = g.createLinearGradient(x, y, x + w, y + h);
-      gr.addColorStop(0, '#d9dde2'); gr.addColorStop(1, '#a8aeb6');
-      g.fillStyle = gr; g.fillRect(x, y, w, h);
-      g.strokeStyle = '#6d737b'; g.lineWidth = 3; g.strokeRect(x, y, w, h);
-      g.fillStyle = '#3b4047'; g.font = '700 16px Arial, sans-serif';
-      lines.forEach((l, i) => g.fillText(l, x + 10, y + 10 + i * 19));
-      [[x + 6, y + 6], [x + w - 10, y + 6], [x + 6, y + h - 10], [x + w - 10, y + h - 10]].forEach(([px, py]) => { g.fillStyle = '#5c6168'; g.fillRect(px, py, 4, 4); });
-      g.fillStyle = ink;
-    };
-    plate(70, 560, 300, 150, ['CSC SAFETY APPROVAL', 'GBR/L/2026/0417', 'DATE MANUFACTURED 03/2026', 'MAX GROSS 30,480 KG', 'ALLOW. STACK 192,000 KG', 'RACKING TEST LOAD 15,240 KG']);
-    plate(70, 730, 300, 70, ['APPROVED FOR TRANSPORT', 'UNDER CUSTOMS SEAL']);
-    // owner logo, right door
-    g.font = '800 46px Arial, sans-serif';
-    g.fillText('BALAR', W - 70 - g.measureText('BALAR').width, 330);
-    g.font = '600 22px Arial, sans-serif';
-    g.fillText('OVERSEAS', W - 70 - g.measureText('OVERSEAS').width, 382);
-    // small hazard/handling stickers at eye level on the right door
-    g.fillStyle = '#f2b705'; g.fillRect(W - 170, 470, 100, 60);
-    g.fillStyle = ink; g.font = '800 16px Arial, sans-serif'; g.fillText('HANDLE', W - 160, 480); g.fillText('WITH CARE', W - 162, 502);
+    g.fillStyle = ink;
+    // owner code + serial + check digit, with the size/type code under it
+    const [owner, serial, check] = number.split(' ');
+    g.font = '600 42px Arial, sans-serif';
+    const t1 = `${owner} ${serial} ${check}`;
+    g.fillText(t1, W - 80 - g.measureText(t1).width, 150);
+    g.font = '600 38px Arial, sans-serif';
+    g.fillText(iso, W - 150 - g.measureText(iso).width, 204);
+    // weights
+    const rows = [['MAX. GR.', '30,480 KGS', '67,200 LBS'], ['TARE', '3,750 KGS', '8,270 LBS'], ['NET', '26,730 KGS', '58,930 LBS'], ['CU. CAP.', '67.7 CU.M', '2,390 CU.FT']];
+    rows.forEach(([k, a, c], i) => {
+      const y = 330 + i * 40;
+      g.font = '600 30px Arial, sans-serif'; g.fillText(k, W / 2 + 110, y);
+      g.font = '600 15px Arial, sans-serif'; g.fillText(a, W / 2 + 290, y); g.fillText(c, W / 2 + 290, y + 17);
+    });
+    // left door: a caution triangle, a small blue approval sticker, a dark data plate low down
+    g.fillStyle = '#c9781f';
+    g.beginPath(); g.moveTo(150, 372); g.lineTo(214, 372); g.lineTo(182, 428); g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(20,20,20,0.7)'; g.lineWidth = 3; g.stroke();
+    g.fillStyle = '#2f55a4'; g.fillRect(318, 372, 40, 48);
+    g.fillStyle = 'rgba(255,255,255,0.75)'; g.font = '700 13px Arial, sans-serif'; g.fillText('CSC', 324, 390);
+    g.fillStyle = '#2c2f33'; g.fillRect(118, 836, 70, 86);
+    g.fillStyle = 'rgba(200,205,210,0.5)';
+    for (let k = 0; k < 6; k++) g.fillRect(126, 846 + k * 12, 54 - (k % 3) * 9, 3);
+    g.fillStyle = ink;
   });
   const m = new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.7, metalness: 0.1, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
   return new THREE.Mesh(new THREE.PlaneGeometry(CONT.W * 0.94, CONT.H * 0.94), m);
@@ -193,36 +213,47 @@ function doorMarkings(number, iso, ink = '#1f2329') {
  * container.glb, from "Container Pack" by drcrazzie, CC-BY 4.0) in the same frame: origin at the
  * bottom centre, long axis along Z, CONT dimensions. `tint` multiplies its (light grey) paint.
  */
-export function upgradeContainer(group, { tint = null, label = '', labelColor = '#1e2328', number = 'BLRU 210450 7', iso = '42G1', ink = '#1f2329' } = {}) {
-  return loadGLB('assets/models/container.glb').then((src) => {
+export function upgradeContainer(group, { tint = null, scanTint = '', sideNumber = true, label = '', labelColor = '#1e2328', logo = '', number = 'BLRU 210450 7', iso = '42G1', ink = '#1f2329' } = {}) {
+  // ?hq (the offline Cycles render of the port phase): the scanned container, whose doors carry
+  // their own seals, rods, stickers and plates; the render script writes the lettering onto them
+  const scan = new URLSearchParams(location.search).has('hq');
+  return loadGLB(scan ? 'assets/models/container_meshy.glb' : 'assets/models/container.glb').then((src) => {
     const model = src.clone(true);
     // GLB: 12.065 × 2.924 (high-cube) × 2.426 m, long axis X → standard 40 ft, long axis Z
     model.rotation.y = -Math.PI / 2;
     model.scale.set(CONT.L / 12.065, CONT.H / 2.924, CONT.W / 2.426);
+    // scanTint: a repaint for the scan only (the live page's box keeps its own paint)
+    if (scan && scanTint) tint = `#${scanTint}`;
     if (tint) {
       model.traverse((o) => {
-        if (o.isMesh) { o.material = o.material.clone(); o.material.color.set(tint); }
+        if (!o.isMesh) return;
+        o.material = o.material.clone();
+        // the scan is repainted in the render (paint only: seals, rods, stickers keep their own colour),
+        // which reads the colour from the material's name
+        if (scan) o.material.name = `CONTM_${tint.replace('#', '')}`;
+        else o.material.color.set(tint);
       });
     }
     group.children.slice().forEach((c) => group.remove(c));
     group.add(model);
     // door end (+Z in this frame): ISO markings, plates, stickers
-    if (number) {
+    if (number && !scan) {
       const d = doorMarkings(number, iso, ink);
       d.position.set(0, CONT.H * 0.5, CONT.L / 2 + 0.012);
       group.add(d);
-      // the number again at the top corner of both long sides, as painted on real boxes
-      [-1, 1].forEach((s) => {
+      // the number again at the top corner of both long sides, as painted on real boxes (not on a box
+      // that takes over from the rendered one, whose sides carry the logo alone)
+      if (sideNumber) [-1, 1].forEach((s) => {
         const t = textPlane(`${number}  ${iso}`, 2.0, 0.22, { color: ink, px: 80, weight: 700 });
-        t.position.set(s * (CONT.W / 2 + 0.03), CONT.H - 0.32, s * (CONT.L / 2 - 1.3));
+        t.position.set(s * (CONT.W / 2 + 0.06), CONT.H - 0.32, s * (CONT.L / 2 - 1.3));   // clear of the corrugations' crests
         t.rotation.y = s * Math.PI / 2;
         group.add(t);
       });
     }
     if (label) {
       [-1, 1].forEach((s) => {
-        const t = textPlane(label, Math.min(6.4, CONT.L * 0.72), 0.75, { color: labelColor, px: 96 });
-        t.position.set(s * (CONT.W / 2 + 0.03), CONT.H * 0.62, -CONT.L * 0.08 * s);
+        const t = sideMark(label, labelColor, logo, CONT.L, CONT.H);
+        t.position.set(s * (CONT.W / 2 + 0.06), logo ? CONT.H * 0.5 : CONT.H * 0.62, -CONT.L * 0.08 * s);
         t.rotation.y = s * Math.PI / 2;
         group.add(t);
       });
@@ -384,12 +415,30 @@ export function buildReachStacker3D({ container: withContainer = true } = {}) {
     ab(new THREE.TubeGeometry(c, 40, 0.045, 8), M.rubber);
   });
   for (let i = 0; i < 4; i++) ab(B(0.06, 0.08, 0.6), M.grey, 1.5 + i * 2, 0.55 - i * 0.02, 0);   // hose clamps
-  // BALAR lettering on both boom sides
+  // lettering on both boom sides, like the reference's: a slim "BALAR overseas" mid-boom (well
+  // inside the boom's height) and the small model code near the foot
+  const boomMark = canvasTex(1024, 128, (g, W, H) => {
+    g.clearRect(0, 0, W, H);
+    g.fillStyle = '#ffffff'; g.textBaseline = 'middle';
+    g.font = '800 76px Archivo, Arial, sans-serif';
+    const w1 = g.measureText('BALAR').width;
+    g.font = '500 54px Archivo, Arial, sans-serif';
+    const w2 = g.measureText(' overseas').width;
+    const x0 = (W - w1 - w2) / 2;
+    g.font = '800 76px Archivo, Arial, sans-serif'; g.fillText('BALAR', x0, H / 2 + 4);
+    g.font = '500 54px Archivo, Arial, sans-serif'; g.fillText(' overseas', x0 + w1, H / 2 + 8);
+  });
   [-1, 1].forEach((s) => {
-    const t = textPlane('BALAR', 3.2, 0.62, { color: '#ffffff', px: 300 });
-    t.position.set(4.0, 0.0, s * 0.468);
+    const t = new THREE.Mesh(new THREE.PlaneGeometry(2.8, 0.35), new THREE.MeshStandardMaterial({ map: boomMark, transparent: true, roughness: 0.5, metalness: 0.1, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+    t.position.set(4.3, 0.04, s * 0.468);
     if (s < 0) t.rotation.y = Math.PI;
+    t.userData = { keep: true, lettering: s };
     boom.add(t);
+    const code = textPlane('BX-4632 RS', 1.0, 0.16, { color: '#ffffff', px: 100, weight: 700 });
+    code.position.set(1.0, 0.05, s * 0.468);
+    if (s < 0) code.rotation.y = Math.PI;
+    code.userData = { keep: true, lettering: s };
+    boom.add(code);
   });
   const boomInner = new THREE.Group();
   boom.add(boomInner);
@@ -503,6 +552,16 @@ export function buildReachStacker3D({ container: withContainer = true } = {}) {
       const { cyl, len } = G.model;
       const dir = new THREE.Vector3(A.x - CYL_B.x, A.y - CYL_B.y, 0);
       cyl.scale.y = dir.length() / len;
+      cyl.quaternion.setFromUnitVectors(up, dir.normalize());
+    }
+    if (G.meshy) {                                   // scanned cylinders: barrel turns to the boom pin, rod slides
+      const { cyl, rod, len0, rodT } = G.meshy;
+      const dir = new THREE.Vector3(A.x - CYL_B.x, A.y - CYL_B.y, 0);
+      // the rod section (from the barrel mouth, rodT, to 0.97 of the modelled length) stretches between the barrel mouth and
+      // the clevis on the boom, so it never parts from either
+      const y0 = rodT * len0, s = (dir.length() - 0.03 * len0 - y0) / ((0.97 - rodT) * len0);
+      rod.scale.y = s;
+      rod.position.y = y0 * (1 - s);
       cyl.quaternion.setFromUnitVectors(up, dir.normalize());
     }
     lights.forEach((l) => {
@@ -652,10 +711,29 @@ function buildUCBody(root, pivot) {
     add(new THREE.BoxGeometry(5.6, 0.012, 0.006), seam, 0.45, 1.5, z);
     add(new THREE.BoxGeometry(0.02, 1.6, 0.006), seam, -3.0, 1.55, s * 1.012);
   });
-  // logo on the hull side (camera side), like the reference's small white mark
-  const logo = textPlane('BALAR OVERSEAS', 1.15, 0.16, { color: '#ffffff', px: 84, weight: 800 });
-  logo.position.set(0.98, 1.05, 0.725);              // between the steps and the front tyres
-  g.add(logo);
+  // logo on both hull sides, like the reference's: a small badge over a two-line white mark,
+  // centred on the panel between the steps and the front tyres
+  const mark = canvasTex(512, 256, (c, W, H) => {
+    c.clearRect(0, 0, W, H);
+    c.fillStyle = '#ffffff';
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillRect(W / 2 - 92, 34, 44, 30);
+    c.fillStyle = '#2a7fa6'; c.font = '800 24px Archivo, Arial, sans-serif'; c.fillText('B', W / 2 - 70, 50);
+    c.fillStyle = '#ffffff'; c.font = '700 36px Archivo, Arial, sans-serif'; c.fillText('Li-ion', W / 2 + 26, 50);
+    c.font = '800 52px Archivo, Arial, sans-serif'; c.fillText('BALAR', W / 2, 122);
+    c.font = '500 34px Archivo, Arial, sans-serif'; c.fillText('overseas', W / 2 + 60, 176);
+  });
+  [-1, 1].forEach((s) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.96, 0.48), new THREE.MeshStandardMaterial({ map: mark, transparent: true, roughness: 0.5, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+    m.position.set(0.74, 1.1, s * 0.726);
+    if (s < 0) m.rotation.y = Math.PI;
+    m.userData = { keep: true, logo: s };
+    g.add(m);
+    // dark vent above it and two rounded locker doors under the cab, with yellow corner reflectors
+    add(new THREE.BoxGeometry(0.6, 0.14, 0.012), dark, 0.74, 1.6, s * 0.722);
+    [-1.0, -0.62].forEach((x) => add(new RoundedBoxGeometry(0.32, 0.2, 0.02, 2, 0.03), black, x, 1.6, s * 0.722));
+    [-2.25, 3.1].forEach((x) => add(new THREE.BoxGeometry(0.12, 0.07, 0.01), new THREE.MeshStandardMaterial({ color: '#f2b51c', roughness: 0.4 }), x, 1.62, s * 0.728));
+  });
   // mudguards over the wheels (outside the hull): front over the twin tyres, rear over the single
   const guard = (x, zIn, zOut, r) => {
     const s = new THREE.Shape();
@@ -714,7 +792,7 @@ function buildUCBody(root, pivot) {
   const PIL = 0.06;
   [[CX0, -1], [CX0, 1], [CX1, -1], [CX1, 1], [CX1 - 0.42, 1]].forEach(([x, sz]) => add(new THREE.BoxGeometry(PIL, CY1 - LOW, PIL), black, x + (x === CX0 ? PIL / 2 : -PIL / 2), (LOW + CY1) / 2, CZ + sz * (CW / 2 - PIL / 2)));
   add(new THREE.BoxGeometry(cl, 0.05, PIL), black, cx, 2.95, CZ + CW / 2 - PIL / 2);         // side rail
-  const clear = new THREE.MeshPhysicalMaterial({ color: '#b9c9d3', roughness: 0.05, metalness: 0, transparent: true, opacity: 0.22, depthWrite: false, clearcoat: 1, envMapIntensity: 1.4, side: THREE.DoubleSide });
+  const clear = new THREE.MeshPhysicalMaterial({ color: '#2e3d48', roughness: 0.05, metalness: 0, transparent: true, opacity: 0.42, depthWrite: false, clearcoat: 1, envMapIntensity: 1.4, side: THREE.DoubleSide });
   const pane = (w, h, x, y, z, ry) => { const m = add(new THREE.PlaneGeometry(w, h), clear, x, y, z); m.rotation.y = ry; m.castShadow = false; m.renderOrder = 2; };
   const GH = CY1 - LOW;
   pane(CW - 0.1, GH, CX1 - 0.004, (LOW + CY1) / 2, CZ, Math.PI / 2);                       // windscreen
@@ -794,13 +872,30 @@ export function upgradeStacker(rig) {
     m.material = recolour.get(key);
   });
   dress(parts.spreader, { dullSteel: true });
+  // the reference's spreader head: a charcoal trapezoid frame from the head link down onto the
+  // main beam, a small white mark on its face
+  {
+    const s = new THREE.Shape();
+    s.moveTo(-1.25, -1.06); s.lineTo(1.25, -1.06); s.lineTo(0.38, -0.5); s.lineTo(-0.38, -0.5);
+    const geo = new THREE.ExtrudeGeometry(s, { depth: 1.3, bevelEnabled: true, bevelSize: 0.03, bevelThickness: 0.03, bevelSegments: 2 });
+    geo.translate(0, 0, -0.65);
+    const plate = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: '#25282d', roughness: 0.5, metalness: 0.4 }));
+    plate.castShadow = true;
+    parts.spreader.add(plate);
+    [-1, 1].forEach((sz) => {
+      const m = textPlane('B', 0.24, 0.24, { color: '#ffffff', px: 700, weight: 800 });
+      m.position.set(0.3, -0.84, sz * 0.69);
+      if (sz < 0) m.rotation.y = Math.PI;
+      parts.spreader.add(m);
+    });
+  }
   dress(parts.boom, { dullSteel: false });
   parts.cylinders.forEach((c) => dress(c.group, { dullSteel: false }));
   parts.wheels.forEach((w) => { w.visible = false; });
   // the reference's boom foot sits further forward and higher than the built one's
   G.PIVOT.set(-2.7, 3.5);
   parts.boom.position.set(G.PIVOT.x, G.PIVOT.y, 0);
-  buildUCBody(parts.root, G.PIVOT);
+  parts.body = buildUCBody(parts.root, G.PIVOT);
   // boom tail (reference): the boom runs on ~1.5 m behind the foot pin, tapering, with the amber
   // beacon on a slim mast at its end (it rides the boom)
   {
@@ -853,6 +948,80 @@ export function upgradeStacker(rig) {
   }));
   parts.wheels.splice(0, parts.wheels.length, ...wheels);
   return Promise.resolve(rig);
+}
+
+/**
+ * Swaps the built stacker for the detailed scan (assets/models/stacker_meshy.glb, made by
+ * blender/prep_meshy_stacker.py, which prints the constants used here): body on the root, outer and
+ * inner boom sections, spreader, lift cylinders and wheels, each already in its part's frame, so
+ * solve/apply drive it unchanged. The scan stands telescope-in with a 20 ft spreader; the inner
+ * boom tube and the spreader's telescoping beams that the animation exposes are added here.
+ * Heavy (~47 MB): used for the offline Cycles render of the port phase, not on the live page.
+ */
+export function useMeshyStacker(rig, url = 'assets/models/stacker_meshy.glb') {
+  const { parts, G } = rig;
+  return loadGLB(url).then((src) => {
+    const hide = (g) => g && g.traverse((m) => { if (m.isMesh) m.visible = false; });
+    [parts.body, parts.boom, parts.spreader, ...parts.wheels, ...parts.cylinders.map((c) => c.group)].forEach(hide);
+    const take = (n) => {
+      const m = src.getObjectByName(`M_${n}`).clone();
+      m.position.set(0, 0, 0); m.quaternion.identity(); m.scale.set(1, 1, 1);
+      m.traverse((o) => { if (o.isMesh) { o.visible = true; o.castShadow = true; o.receiveShadow = true; o.material.name = 'MESHY'; } });   // named so the render can swap in the full-resolution maps
+      return m;
+    };
+    const steel = new THREE.MeshStandardMaterial({ color: '#27333a', roughness: 0.55, metalness: 0.35 });   // the scan's boom paint
+    const tube = (w, h, d, x, y, z) => {
+      const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 2, 0.03), steel);
+      m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true;
+      return m;
+    };
+    // kinematics as scanned: foot pin, head pin with the telescope in (ext 0), cylinder pins
+    G.PIVOT.set(-3.3712, 4.0306);
+    G.TIP.set(8.9211, -0.638);
+    G.CYL_B.set(1.2503, 2.1148, 0);
+    G.CYL_A.set(2.9731, 0.7233);
+    G.wheelR = 0.915;
+    parts.boom.position.set(G.PIVOT.x, G.PIVOT.y, 0);
+    parts.root.add(take('body'));
+    parts.boom.add(take('outer'));
+    parts.boomInner.add(take('inner'));
+    // inner boom tube: rides the inner section, hidden in the outer one until the telescope runs out
+    const U_INNER = 7.85;
+    parts.boomInner.add(tube(6.6, 0.56, 0.68, U_INNER - 3.1, 0.615, 0));
+    // spreader: centre as scanned, the two ends run out from 20 ft to the box length on their beams
+    parts.spreader.add(take('spreader'));
+    const RUN = CONT.L / 2 - 0.09 - 3.63;              // twistlocks from the scan's 3.63 m to the corner castings
+    [['spreadL', 1], ['spreadR', -1]].forEach(([n, s]) => {
+      const end = take(n);
+      end.position.z = s * RUN;
+      parts.spreader.add(end);
+      parts.spreader.add(tube(0.6, 0.55, 1.87 + RUN + 0.4 - 1.5, -0.025, -1.09, s * (1.5 + (1.87 + RUN + 0.4 - 1.5) / 2)));
+    });
+    // cylinders: barrel turns about the foot pin, the rod stretches from its mouth to the boom pin
+    const cyl = new THREE.Group();
+    cyl.position.set(G.CYL_B.x, G.CYL_B.y, 0);
+    parts.root.add(cyl);
+    cyl.add(take('barrel'));
+    const rod = take('rod');
+    cyl.add(rod);
+    G.meshy = { cyl, rod, len0: 3.7865, rodT: 0.657 };
+    // wheels: the scan's own, cut off the body, on the page's wheel groups so they roll with the
+    // machine; axle centres as fitted to each tyre's tread (prep script: WHEEL FIT), so nothing wobbles
+    [['wFL', 0, 2.59, 0.926, 1.77], ['wFR', 1, 2.592, 0.927, -1.77], ['wRL', 4, -4.062, 0.932, 2.0], ['wRR', 5, -4.062, 0.93, -2.0]].forEach(([n, i, x, y, z]) => {
+      parts.wheels[i].position.set(x, y, z);
+      parts.wheels[i].add(take(n));
+    });
+    // lettering the scan does not carry (its boom reads just "BALAR"): "overseas" on the inner boom
+    // tube, where it shows as soon as the telescope runs out, the model code further down the boom,
+    // and the two-line mark on the hull side
+    [-1, 1].forEach((s) => {
+      const put = (group, m, x, y, z) => { m.position.set(x, y, s * z); if (s < 0) m.rotation.y = Math.PI; m.userData.keep = true; group.add(m); };
+      put(parts.boomInner, textPlane('overseas', 1.7, 0.36, { color: '#ffffff', px: 190, weight: 600 }), U_INNER - 0.95, 0.615, 0.346);
+      put(parts.boom, textPlane('BX-4632 RS', 0.9, 0.15, { color: '#ffffff', px: 110, weight: 700 }), 4.42, 0.59, 0.59);
+    });
+    parts.body.traverse((m) => { if (m.userData.logo) { m.visible = true; m.scale.setScalar(1.0); m.position.set(-0.02, 1.07, m.userData.logo * 2.025); } });
+    return rig;
+  });
 }
 
 // ------------------------------------------------------------------ choreography

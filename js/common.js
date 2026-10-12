@@ -13,7 +13,7 @@ export const range = (p, a, b) => clamp01((p - a) / (b - a));
 export const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 export const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const finePointer = matchMedia('(pointer: fine)').matches;
-const LOGO = 'https://balaroverseas.com/wp-content/uploads/2026/02/balar-new-logo.png';
+const LOGO = 'assets/img/logo-on-dark.webp';
 
 export function splitWords(el, cls = 'w', inner = 'wi') {
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
@@ -97,6 +97,8 @@ export function initCommon({ startStopped = false } = {}) {
   const setMenu = (open) => { menu.classList.toggle('open', open); menuBtn.setAttribute('aria-expanded', open); };
   menuBtn.addEventListener('click', () => setMenu(!menu.classList.contains('open')));
   $('#menuClose').addEventListener('click', () => setMenu(false));
+  addEventListener('keydown', (e) => { if (e.key === 'Escape') setMenu(false); });
+  addEventListener('pointerdown', (e) => { if (menu.classList.contains('open') && !menu.contains(e.target) && !menuBtn.contains(e.target)) setMenu(false); });
 
   // Links: same-page anchors scroll smoothly, other pages get the curtain transition
   document.addEventListener('click', (e) => {
@@ -160,6 +162,17 @@ export function initCommon({ startStopped = false } = {}) {
     if (!open) { qa.classList.add('open'); $('.ans', qa).style.maxHeight = $('.ans', qa).scrollHeight + 'px'; }
     setTimeout(() => ScrollTrigger.refresh(), 480);
   }));
+  // home page: the first answer starts open, so the list does not read as six closed bars
+  const firstQ = $('#faqList .qa');
+  if (firstQ) {
+    firstQ.classList.add('open');
+    // measured again once fonts and layout have settled, or the last line is cut off
+    const fit = () => { const q = $('#faqList .qa.open'); if (q) $('.ans', q).style.maxHeight = $('.ans', q).scrollHeight + 'px'; };
+    fit();
+    addEventListener('load', fit);
+    addEventListener('resize', fit);
+    setTimeout(fit, 1500);
+  }
 
   // Keep trigger positions right when late images change the page height
   let refreshTimer = 0, lastH = 0;
@@ -187,7 +200,7 @@ export function setupReveals() {
     const end = +el.dataset.count, suf = el.dataset.suffix || '', o = { v: 0 };
     ScrollTrigger.create({
       trigger: el, start: 'top 90%', once: true,
-      onEnter: () => gsap.to(o, { v: end, duration: 2.2, ease: 'power3.out', onUpdate: () => { el.textContent = Math.round(o.v).toLocaleString('en-IN') + suf; } }),
+      onEnter: () => gsap.to(o, { v: end, duration: 2.2, ease: 'power3.out', onStart: () => el.closest('.stat')?.classList.add('in'), onUpdate: () => { el.innerHTML = Math.round(o.v).toLocaleString('en-IN') + (suf ? `<i>${suf}</i>` : ''); } }),
     });
   });
   $$('.reveal-words').forEach((el) => {
@@ -235,6 +248,32 @@ export function setupFooter() {
   if (map) drawDotMap(map, { gap: 9, dot: 3, color: '#dadada', markers: [{ lat: 21.17, lon: 72.83, color: '#3b2cff' }, { lat: 23.13, lon: 113.26, color: '#3b2cff' }] }).catch(() => {});
   const pts = $('#footParticles');
   if (pts) particleText(pts, 'BALAROVERSEAS');
+  setupSocialProof();
+}
+
+// Instagram follower count. The number lives in data/social.json (kept fresh by the scheduled job
+// in .github/workflows/instagram-count.yml), never in the markup, so every page shows the same,
+// current figure. 11000 -> "11K+", 11480 -> "11.4K+", 1250000 -> "1.2M+".
+const shortCount = (n) => {
+  const cut = (v, unit) => `${(Math.floor(v * 10) / 10).toString().replace(/\.0$/, '')}${unit}+`;
+  if (n >= 1e6) return cut(n / 1e6, 'M');
+  if (n >= 1e3) return cut(n / 1e3, 'K');
+  return String(n);
+};
+async function setupSocialProof() {
+  // footer: the Instagram link becomes a wide button that carries the count
+  const ig = $('.f-soc-icons a[href*="instagram"]');
+  if (ig && !ig.classList.contains('ig-wide')) {
+    ig.classList.add('ig-wide');
+    ig.insertAdjacentHTML('beforeend', '<b data-ig-count></b><i>followers</i><u>Follow →</u>');
+  }
+  let n = 0;
+  try {
+    const r = await fetch(`data/social.json?t=${Math.floor(Date.now() / 3.6e6)}`);   // at most an hour stale
+    n = Number((await r.json()).instagram.followers) || 0;
+  } catch (e) { /* offline or missing: the fallback below stands */ }
+  const label = n ? shortCount(n) : '';
+  $$('[data-ig-count]').forEach((el) => { if (label) el.textContent = label; else if (!el.textContent) el.closest('.ig-proof,.ig-wide')?.classList.add('no-count'); });
 }
 
 // Horizontal scrollers: a tall section whose sticky track slides sideways as you scroll

@@ -1,76 +1,97 @@
-// Footer: brand name built from a dot-matrix of particles that scatter around the cursor.
+// Footer: brand name built from a dot-matrix of particles. As the reference runs its own: round
+// 2px dots on a 4px grid in mid grey; they fly in from random places the first time the footer
+// shows, and the cursor (anywhere on the page) knocks the ones within ~55px away, each with its
+// own ease and friction, before they settle back. The canvas is larger than the wordmark's box
+// (1.5× wide, 3× tall) so scattered dots are not cut off at its edges.
 export function particleText(canvas, text = 'BALAROVERSEAS', opts = {}) {
-  const { color = '#d4d4d4', hot = '#3b2cff', gap = 5, size = 2 } = opts;
+  const { color = '#a0a0a0', gap = 4, size = 2 } = opts;
+  const host = canvas.parentElement;
   const g = canvas.getContext('2d');
-  let parts = [], W = 0, H = 0, dpr = 1;
-  const mouse = { x: -9999, y: -9999, on: false };
+  let parts = [], W = 0, H = 0, CW = 0, CH = 0, dpr = 1;
+  const R2 = 3000, R = Math.sqrt(R2);
+  const mouse = { x: -1e4, y: -1e4, on: false, timer: 0 };
+
+  Object.assign(canvas.style, { position: 'absolute', left: '-25%', top: '-100%', width: '150%', height: '300%', inset: 'auto', pointerEvents: 'none' });
+  canvas.style.left = '-25%';
+  canvas.style.top = '-100%';
 
   function build() {
     dpr = Math.min(devicePixelRatio || 1, 2);
-    W = canvas.clientWidth; H = canvas.clientHeight;
+    W = host.clientWidth; H = host.clientHeight;
     if (!W || !H) return;
-    canvas.width = W * dpr; canvas.height = H * dpr;
+    CW = W * 1.5; CH = H * 3;
+    canvas.width = CW * dpr; canvas.height = CH * dpr;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    // Render the word once, then sample it on a grid.
+    // Render the word once in the box, then sample it on the grid.
     const off = document.createElement('canvas');
     off.width = W; off.height = H;
-    const o = off.getContext('2d');
+    const o = off.getContext('2d', { willReadFrequently: true });
     let fs = H * 0.95;
-    o.font = `800 ${fs}px Saira, Arial, sans-serif`;
+    o.font = `800 ${fs}px Oxanium, Arial, sans-serif`;
     const fit = W * 0.98 / o.measureText(text).width;
     fs = Math.min(fs, fs * fit);
-    o.font = `800 ${fs}px Saira, Arial, sans-serif`;
+    o.font = `800 ${fs}px Oxanium, Arial, sans-serif`;
     o.textAlign = 'center';
     o.textBaseline = 'middle';
     o.fillStyle = '#000';
     o.fillText(text, W / 2, H * 0.56);
     const data = o.getImageData(0, 0, W, H).data;
 
-    const step = Math.max(3, Math.round(gap * (W / 1400) + 2));
+    const settled = parts.length > 0;          // on a resize the dots stay put instead of flying in again
     parts = [];
-    for (let y = 0; y < H; y += step) {
-      for (let x = 0; x < W; x += step) {
-        if (data[(y * W + x) * 4 + 3] > 128) parts.push({ hx: x, hy: y, x, y, vx: 0, vy: 0 });
+    const ox = W * 0.25, oy = H;
+    for (let y = 0; y < H; y += gap) {
+      for (let x = 0; x < W; x += gap) {
+        if (data[(y * W + x) * 4 + 3] > 128) {
+          const hx = ox + x, hy = oy + y;
+          parts.push({
+            hx, hy,
+            x: settled ? hx : Math.random() * CW, y: settled ? hy : Math.random() * CH,
+            vx: 0, vy: 0,
+            ease: 0.04 + 0.04 * Math.random(), kick: 0.2 + 0.2 * Math.random(), fr: 0.8 + 0.15 * Math.random(),
+          });
+        }
       }
     }
-    parts.size = Math.max(1.2, step * 0.42);
   }
 
-  canvas.addEventListener('pointermove', (e) => {
+  addEventListener('mousemove', (e) => {
     const r = canvas.getBoundingClientRect();
     mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top; mouse.on = true;
+    clearTimeout(mouse.timer);
+    mouse.timer = setTimeout(() => { mouse.on = false; }, 100);
   });
-  canvas.addEventListener('pointerleave', () => { mouse.on = false; mouse.x = mouse.y = -9999; });
 
   let visible = false;
-  new IntersectionObserver(([e]) => { visible = e.isIntersecting; }).observe(canvas);
+  new IntersectionObserver(([e]) => { visible = e.isIntersecting; }).observe(host);
 
   function frame() {
     requestAnimationFrame(frame);
-    if (!visible) return;
-    g.clearRect(0, 0, W, H);
-    const R = Math.max(60, W * 0.07), s = parts.size || size;
+    if (!visible || !parts.length) return;
+    g.clearRect(0, 0, CW, CH);
+    g.fillStyle = color;
+    g.beginPath();
+    const r = size / 2, TAU = Math.PI * 2;
     for (const p of parts) {
-      const dx = p.x - mouse.x, dy = p.y - mouse.y;
-      const d2 = dx * dx + dy * dy;
-      let heat = 0;
-      if (d2 < R * R) {
-        const d = Math.sqrt(d2) || 1, f = (1 - d / R);
-        p.vx += (dx / d) * f * 3.2;
-        p.vy += (dy / d) * f * 3.2;
-        heat = f;
+      if (mouse.on) {
+        const dx = mouse.x - p.x, dy = mouse.y - p.y, d2 = dx * dx + dy * dy;
+        if (d2 < R2) {
+          p.ease = p.kick;
+          const d = Math.sqrt(d2) || 1, f = -(R - d) / R * 150 * (0.5 + Math.random());
+          p.vx += dx / d * f + (Math.random() - 0.5);
+          p.vy += dy / d * f + (Math.random() - 0.5);
+        }
       }
-      p.vx += (p.hx - p.x) * 0.06;
-      p.vy += (p.hy - p.y) * 0.06;
-      p.vx *= 0.82; p.vy *= 0.82;
-      p.x += p.vx; p.y += p.vy;
-      g.fillStyle = heat > 0.05 ? hot : color;
-      g.fillRect(p.x, p.y, s, s);
+      p.x += (p.vx *= p.fr) + (p.hx - p.x) * p.ease;
+      p.y += (p.vy *= p.fr) + (p.hy - p.y) * p.ease;
+      g.moveTo(p.x + r, p.y);
+      g.arc(p.x, p.y, r, 0, TAU);
     }
+    g.fill();
   }
 
   build();
-  new ResizeObserver(build).observe(canvas);
+  new ResizeObserver(build).observe(host);
   requestAnimationFrame(frame);
 }

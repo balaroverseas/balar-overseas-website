@@ -20,6 +20,12 @@ while ($l.IsListening) {
     $c.Response.Close()
     continue
   }
+  # dev only: exported reference images may be read by a page on another origin (e.g. a 3D tool)
+  if ($p -match '^_export/') {
+    $c.Response.AddHeader("Access-Control-Allow-Origin", "*")
+    $c.Response.AddHeader("Access-Control-Allow-Private-Network", "true")
+    if ($c.Request.HttpMethod -eq "OPTIONS") { $c.Response.AddHeader("Access-Control-Allow-Methods", "GET"); $c.Response.Close(); continue }
+  }
   $f = Join-Path $root $p
   if (Test-Path $f -PathType Leaf) {
     $b = [IO.File]::ReadAllBytes($f)

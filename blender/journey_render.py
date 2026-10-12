@@ -20,6 +20,9 @@ ap = argparse.ArgumentParser()
 ap.add_argument('--frames', default='1')
 ap.add_argument('--samples', type=int, default=64)
 ap.add_argument('--res', default='1280x720')
+ap.add_argument('--count', type=int, default=0)      # N evenly spaced frames of the export, written f001..fN
+ap.add_argument('--mob', action='store_true')      # the phone staging (page ?mob): seen from the far side, so the sun and the shadow ground swap sides
+ap.add_argument('--resume', action='store_true')   # skip frames already on disk (power cuts)
 ap.add_argument('--out', default=os.path.join(os.path.dirname(__file__), '..', 'seq', 'port'))
 args = ap.parse_args(argv)
 rx, ry = map(int, args.res.split('x'))
@@ -42,12 +45,63 @@ def hide_tree(o, h):
             hide_tree(c, h)
 
 
+off = set()                                   # switched off at the start, with everything under them
 for n in hidden:
     if n in objs:
         o = objs[n]
         o.hide_render = True
+        off.add(n)
         for c in o.children_recursive:
             c.hide_render = True
+            off.add(c.name)
+
+
+# ---------------------------------------------------------------- the scan's full-resolution maps
+# the page exports the scanned stacker with 2K copies of its textures (WebGL); the render takes the
+# full-resolution ones straight from the prep script's _hi file (same meshes, same UVs)
+HI = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'assets', 'models', 'stacker_meshy_hi.glb'))   # abspath: the raw '..' form overruns MAX_PATH here
+scan = [m for m in bpy.data.materials if m.name.startswith('MESHY') and m.use_nodes]
+
+
+def tex_nodes(mat):
+    """Principled input name -> the image node feeding it"""
+    b = mat.node_tree.nodes.get('Principled BSDF')
+    out = {}
+    for key in ('Base Color', 'Metallic', 'Normal'):
+        n = b.inputs[key].links[0].from_node if b and b.inputs[key].is_linked else None
+        while n and n.type != 'TEX_IMAGE':
+            n = next((i.links[0].from_node for i in n.inputs if i.is_linked), None)
+        if n:
+            out[key] = n
+    return out
+
+
+if scan and os.path.exists(HI):
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=HI)
+    fresh = [o for o in bpy.data.objects if o not in before]
+    src = tex_nodes(next(o for o in fresh if o.type == 'MESH').active_material)
+    for m in scan:
+        for key, node in tex_nodes(m).items():
+            if key in src:
+                node.image = src[key].image
+    print('SCAN MAPS', {k: n.image.size[:] for k, n in src.items()})
+    for o in fresh:
+        bpy.data.objects.remove(o)
+
+# lettering is drawn on thin see-through planes a few cm off the surface: in a path tracer each one
+# would throw its own shadow onto the wall behind it (a blurred double of the text) -> no shadows
+for o in sc.objects:
+    m = o.active_material if o.type == 'MESH' else None
+    if m and m.use_nodes and not m.name.startswith('MESHY'):
+        b = m.node_tree.nodes.get('Principled BSDF')
+        if b and b.inputs['Alpha'].is_linked and len(o.data.polygons) <= 4:
+            o.visible_shadow = False
+            o.visible_diffuse = False          # nor dim the wall behind by blocking bounced light
+            o.visible_glossy = False
+            # flat ink: no sheen from the sky, so dark lettering stays dark and white stays clean
+            b.inputs['Roughness'].default_value = 1.0
+            b.inputs['Specular IOR Level'].default_value = 0.0
 
 # ---------------------------------------------------------------- materials: a touch of realism
 # bevelled edges on the plain painted parts (catch the light like the reference); paint that is not
@@ -86,6 +140,157 @@ for m in bpy.data.materials:
             nt.links.new(nz.outputs['Fac'], mr.inputs['Value'])
             nt.links.new(mr.outputs['Result'], b.inputs['Roughness'])
 
+# ---------------------------------------------------------------- the scanned container
+# (assets/models/container_meshy*.glb, material CONTM). Its full-resolution maps come from the _hi
+# file like the stacker's. The generator cannot hold small lettering: what it drew on the doors is
+# painted out (three patches on each end, the lock rods left alone) and written again as real text.
+CONT_HI = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'assets', 'models', 'container_meshy_hi.glb'))
+cont_mats = [m for m in bpy.data.materials if m.name.startswith('CONTM') and m.use_nodes]
+if cont_mats and os.path.exists(CONT_HI):
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=CONT_HI)
+    fresh = [o for o in bpy.data.objects if o not in before]
+    src = tex_nodes(next(o for o in fresh if o.type == 'MESH').active_material)
+    for m in cont_mats:
+        for key, node in tex_nodes(m).items():
+            if key in src:
+                node.image = src[key].image
+    for o in fresh:
+        bpy.data.objects.remove(o)
+
+# patches in the container's own frame: u runs to the viewer's right across the door, z is height
+PATCHES = [(0.229, 1.135, 2.025, 2.335), (0.200, 0.965, 1.510, 1.800), (0.200, 0.965, 1.180, 1.350)]
+RODS = [0.240, 0.606]
+PAINT = (0.651, 0.672, 0.693, 1.0)          # the doors' own paint, read off the scan's colour map beside the lettering
+
+
+def mnode(nt, op, a, b=None):
+    n = nt.nodes.new('ShaderNodeMath')
+    n.operation = op
+    for i, v in enumerate((a, b)):
+        if v is None:
+            continue
+        if isinstance(v, (int, float)):
+            n.inputs[i].default_value = v
+        else:
+            nt.links.new(v, n.inputs[i])
+    return n.outputs[0]
+
+
+for m in cont_mats:
+    nt = m.node_tree
+    img = tex_nodes(m).get('Base Color')
+    if not img:
+        continue
+    users = [l.to_socket for l in img.outputs['Color'].links]     # taken before anything here reads the map too
+    tc = nt.nodes.new('ShaderNodeTexCoord')
+    sep = nt.nodes.new('ShaderNodeSeparateXYZ')
+    nt.links.new(tc.outputs['Object'], sep.inputs[0])
+    x, y, z = sep.outputs
+    end = mnode(nt, 'GREATER_THAN', mnode(nt, 'ABSOLUTE', x), 5.6)
+    u = mnode(nt, 'MULTIPLY', y, mnode(nt, 'SIGN', x))
+    zone = None
+    for u0, u1, z0, z1 in PATCHES:
+        k = mnode(nt, 'MULTIPLY', mnode(nt, 'MULTIPLY', mnode(nt, 'GREATER_THAN', u, u0), mnode(nt, 'LESS_THAN', u, u1)),
+                 mnode(nt, 'MULTIPLY', mnode(nt, 'GREATER_THAN', z, z0), mnode(nt, 'LESS_THAN', z, z1)))
+        zone = k if zone is None else mnode(nt, 'MAXIMUM', zone, k)
+    # where a lock rod crosses a patch only what is dark (ink) goes: the rod itself is as light as the paint
+    bw = nt.nodes.new('ShaderNodeRGBToBW')
+    nt.links.new(img.outputs['Color'], bw.inputs[0])
+    dark = mnode(nt, 'LESS_THAN', bw.outputs[0], 0.36)
+    keep = None
+    for r in RODS:
+        k = mnode(nt, 'LESS_THAN', mnode(nt, 'ABSOLUTE', mnode(nt, 'SUBTRACT', u, r)), 0.05)
+        keep = k if keep is None else mnode(nt, 'MAXIMUM', keep, k)
+    zone = mnode(nt, 'MULTIPLY', zone, mnode(nt, 'MAXIMUM', mnode(nt, 'SUBTRACT', 1.0, keep), dark))
+    mask = mnode(nt, 'MULTIPLY', zone, end)
+    mix = nt.nodes.new('ShaderNodeMix')
+    mix.data_type = 'RGBA'
+    mix.inputs['B'].default_value = PAINT
+    # repaint: the colour in the material's name (CONTM_rrggbb) replaces the paint only — what is
+    # light and colourless in the map; seals, hazard tape, stickers and plates stay as they are
+    out = mix.outputs['Result']
+    hexc = m.name.split('_')[1][:6] if '_' in m.name else ''
+    if len(hexc) == 6:
+        lin = [((int(hexc[i:i + 2], 16) / 255) ** 2.2) for i in (0, 2, 4)]
+        hsv = nt.nodes.new('ShaderNodeSeparateColor')
+        hsv.mode = 'HSV'
+        nt.links.new(out, hsv.inputs[0])
+        # a soft edge on "colourless": the scan's paint drifts a little cream in places, and a hard cut
+        # left those places unpainted, as pale streaks down the sides
+        soft = nt.nodes.new('ShaderNodeMapRange')
+        soft.interpolation_type = 'SMOOTHSTEP'
+        soft.inputs['From Min'].default_value = 0.30
+        soft.inputs['From Max'].default_value = 0.55
+        soft.inputs['To Min'].default_value = 1.0
+        soft.inputs['To Max'].default_value = 0.0
+        nt.links.new(hsv.outputs[1], soft.inputs['Value'])
+        is_paint = mnode(nt, 'MULTIPLY', soft.outputs['Result'], mnode(nt, 'GREATER_THAN', hsv.outputs[2], 0.30))
+        mul = nt.nodes.new('ShaderNodeMix')
+        mul.data_type = 'RGBA'
+        mul.blend_type = 'MULTIPLY'
+        mul.inputs['Factor'].default_value = 1.0
+        base = 0.2126 * PAINT[0] + 0.7152 * PAINT[1] + 0.0722 * PAINT[2]
+        mul.inputs['B'].default_value = (lin[0] / base, lin[1] / base, lin[2] / base, 1)
+        # the new coat goes over the paint's light and shade only, not over its own (cream, lilac) casts
+        grey = nt.nodes.new('ShaderNodeRGBToBW')
+        nt.links.new(out, grey.inputs[0])
+        nt.links.new(grey.outputs[0], mul.inputs['A'])
+        pick = nt.nodes.new('ShaderNodeMix')
+        pick.data_type = 'RGBA'
+        nt.links.new(is_paint, pick.inputs['Factor'])
+        nt.links.new(out, pick.inputs['A'])
+        nt.links.new(mul.outputs['Result'], pick.inputs['B'])
+        out = pick.outputs['Result']
+        m['dark_paint'] = (0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]) < 0.2
+    for sock in users:
+        nt.links.new(out, sock)
+    # the scan's normal map is rough on the flat walls: under the sun and the blue sky each facet took
+    # its own tint (pink and lilac bands along the sides); at half strength the wall reads as one colour
+    for n in nt.nodes:
+        if n.type == 'NORMAL_MAP':
+            n.inputs['Strength'].default_value = 0.45
+    nt.links.new(img.outputs['Color'], mix.inputs['A'])
+    nt.links.new(mask, mix.inputs['Factor'])
+
+ink = bpy.data.materials.new('CONT_INK')
+ink.use_nodes = True
+ib = ink.node_tree.nodes['Principled BSDF']
+ib.inputs['Base Color'].default_value = (0.015, 0.016, 0.018, 1)
+ib.inputs['Roughness'].default_value = 1.0
+ib.inputs['Specular IOR Level'].default_value = 0.0
+ink_white = ink.copy()
+ink_white.name = 'CONT_INK_WHITE'
+ink_white.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = (0.85, 0.86, 0.87, 1)   # on dark paint the lettering is white
+# (text, u of its left edge, z of its baseline, size)
+# kept clear of the two lock rods (u 0.24 and 0.61): the owner code between them, the rest to the right
+LINES = [('BLRU', 0.300, 2.195, 0.108), ('210450 7', 0.668, 2.195, 0.108), ('45G1', 0.668, 2.050, 0.108),
+         ('MAX. GR.', 0.298, 1.700, 0.057), ('TARE', 0.298, 1.585, 0.057), ('CU. CAP.', 0.298, 1.240, 0.057),
+         ('30,480 KGS', 0.672, 1.735, 0.046), ('67,200 LBS', 0.672, 1.675, 0.046), ('3,750 KGS', 0.672, 1.610, 0.046), ('8,270 LBS', 0.672, 1.550, 0.046),
+         ('67.7 CU.M', 0.672, 1.280, 0.046), ('2,390 CU.FT', 0.672, 1.220, 0.046)]
+bpy.context.view_layer.update()
+dg = bpy.context.evaluated_depsgraph_get()
+boxes = [o for o in sc.objects if o.type == 'MESH' and o.active_material and o.active_material.name.startswith('CONTM')]
+print('CONTAINERS', len(boxes))
+for box in boxes:
+    for s in (1, -1):
+        # where the door panel stands along the box (ray down the length onto a clear part of the panel)
+        hit, loc, _n, _i = box.evaluated_get(dg).ray_cast(Vector((s * 8.0, s * 0.90, 2.12)), Vector((-s, 0, 0)))
+        face = abs(loc.x) if hit else 6.0
+        for text, u, z, size in LINES:
+            cu = bpy.data.curves.new('lettering', 'FONT')
+            cu.body = text
+            cu.size = size
+            cu.offset = size * 0.035           # a heavier stroke, like stencilled paint
+            t = bpy.data.objects.new('lettering', cu)
+            sc.collection.objects.link(t)
+            t.data.materials.append(ink_white if box.active_material.get('dark_paint') else ink)
+            t.parent = box
+            # reads along u, stands up along z, faces out of the end
+            t.matrix_parent_inverse = Matrix.Identity(4)
+            t.matrix_local = Matrix(((0, 0, s, s * (face + 0.004)), (s, 0, 0, s * u), (0, 1, 0, z), (0, 0, 0, 1)))
+            t.visible_shadow = False
+
 # ---------------------------------------------------------------- animation (three.js Y-up → Blender Z-up)
 F = anim['frames']
 sc.frame_start, sc.frame_end = 1, F
@@ -115,7 +320,7 @@ for i, o in enumerate(movers):
     vis = [anim['data'][f][i][10] for f in range(F)]
     if all(vis):
         continue
-    kids = [c for c in o.children_recursive if c.name not in hidden and c not in movers]
+    kids = [c for c in o.children_recursive if c.name not in off and c not in movers]   # never wake a switched-off part
     for f in range(F):
         if f and vis[f] == vis[f - 1]:
             continue
@@ -161,12 +366,17 @@ sd.energy = 2.6
 sd.angle = math.radians(3)
 sun = bpy.data.objects.new('sun', sd)
 sc.collection.objects.link(sun)
-d = Vector((14, -24, 40)).normalized()                     # page: SUN_OFFSET (14, 40, 24)
+d = Vector((14, 24 if args.mob else -24, 40)).normalized()   # page: SUN_OFFSET (14, 40, 24), z flipped for ?mob
 sun.rotation_euler = d.to_track_quat('Z', 'Y').to_euler()
 # ground: catches shadows only, composited over the page white
-bpy.ops.mesh.primitive_plane_add(size=600, location=(0, 0, -0.01))
+# kept behind the kerb line on the camera's side: late in the phase the camera drops just below ground
+# level, and a shadow catcher seen from underneath hides everything standing on it (the truck vanished)
+# (?mob: the side camera stands on the other side, below ground level too: the ground then starts just
+# in front of the boxes' near ends, three z = -20.1)
+bpy.ops.mesh.primitive_plane_add(size=600, location=(0, -279.9 if args.mob else 297, -0.01))
 gp = bpy.context.object
 gp.is_shadow_catcher = True
+gp.hide_render = args.mob          # the phone staging has no ground shadows (flat dark page, like the reference)
 
 # ---------------------------------------------------------------- render
 sc.render.engine = 'CYCLES'
@@ -175,13 +385,14 @@ cyc.device = 'CPU'                 # the machine's CUDA card (sm_60) has no Cycl
 cyc.samples = args.samples
 cyc.use_denoising = True
 cyc.max_bounces = 6
+cyc.filter_width = 1.0             # crisper edges than the 1.5 px default (frames are shown near 1:1)
 sc.render.film_transparent = True
 sc.render.resolution_x, sc.render.resolution_y = rx, ry
 sc.render.resolution_percentage = 100
 sc.view_settings.view_transform = 'Standard'
 sc.view_settings.look = 'None'
 sc.render.image_settings.file_format = 'WEBP'
-sc.render.image_settings.quality = 88
+sc.render.image_settings.quality = 92
 sc.render.image_settings.color_mode = 'RGBA'     # transparent with the shadows in alpha: the page white shows through
 
 os.makedirs(args.out, exist_ok=True)
@@ -190,8 +401,15 @@ if '-' in args.frames:
     frames = range(a, b + 1)
 else:
     frames = [int(x) for x in args.frames.split(',')]
+names = {f: f for f in frames}
+if args.count:
+    pick = [round(1 + k * (F - 1) / (args.count - 1)) for k in range(args.count)]
+    names = {src: k + 1 for k, src in enumerate(pick) if src in names}
+    frames = [f for f in pick if f in names]
 for f in frames:
     sc.frame_set(f)
-    sc.render.filepath = os.path.join(args.out, f'f{f:03d}.webp')
+    sc.render.filepath = os.path.join(args.out, f'f{names[f]:03d}.webp')
+    if args.resume and os.path.exists(sc.render.filepath) and os.path.getsize(sc.render.filepath) > 2000:
+        continue
     bpy.ops.render.render(write_still=True)
 print('DEVICE', cyc.device)

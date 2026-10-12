@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Mobile modules | Balar Overseas (preview)</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#1b1c20;color:#eee;font:14px/1.4 system-ui,Segoe UI,Arial,sans-serif;display:flex;gap:28px;justify-content:center;align-items:flex-start;padding:16px}
+  .phone{flex:none;width:375px;height:812px;border-radius:26px;overflow:hidden;box-shadow:0 0 0 8px #000,0 20px 60px rgba(0,0,0,.6);background:#fff;transform-origin:top center}
+  .phone iframe{width:375px;height:812px;border:0;display:block}
+  .side{width:300px;padding-top:6px}
+  h1{font-size:18px;margin:0 0 4px}
+  p{color:#a9abb3;margin:0 0 16px}
+  .mods{display:grid;gap:8px;margin-bottom:22px}
+  .mods button{all:unset;cursor:pointer;padding:12px 14px;border-radius:10px;background:#2a2c33;display:flex;justify-content:space-between;align-items:center}
+  .mods button b{font-weight:600}
+  .mods button span{color:#8d909a;font-size:12px}
+  .mods button.on{background:#3b2cff}
+  .mods button.on span{color:#d6d2ff}
+  label{display:block;color:#a9abb3;font-size:12px;margin-bottom:6px}
+  input[type=range]{width:100%}
+  .row{display:flex;gap:8px;margin-top:14px}
+  .row button{all:unset;cursor:pointer;padding:9px 14px;border-radius:8px;background:#2a2c33}
+  .row button:hover,.mods button:hover{filter:brightness(1.2)}
+  #pct{font-variant-numeric:tabular-nums;color:#fff}
+</style>
+</head>
+<body>
+<div class="phone" id="phone"><iframe id="f" src="index.html?mob" title="phone preview"></iframe></div>
+<div class="side">
+  <h1>Mobile modules</h1>
+  <p>Phone screen 375 × 812. Pick a module, then drag the slider or press Play.</p>
+  <div class="mods" id="mods"></div>
+  <label>Position in module: <span id="pct">0%</span></label>
+  <input type="range" id="s" min="0" max="1000" value="0">
+  <div class="row"><button id="play">▶ Play</button><button id="back">⟲ Start</button></div>
+</div>
+<script>
+// Each module is a stretch of the home page, by scroll position inside the phone frame.
+const f = document.getElementById('f'), s = document.getElementById('s'), pct = document.getElementById('pct');
+const phone = document.getElementById('phone');
+const fit = () => { const k = Math.min(1, (innerHeight - 40) / 812); phone.style.transform = `scale(${k})`; phone.style.marginBottom = `${-812 * (1 - k)}px`; };
+fit(); addEventListener('resize', fit);
+let cur = null, timer = null;
+const W = () => f.contentWindow, D = () => f.contentDocument;
+const topOf = (q) => D().querySelector(q).getBoundingClientRect().top + W().scrollY;
+const mods = [
+  { name: 'Stacker', note: 'lift, swing overhead, load', range: () => { const a = topOf('#services'), h = D().querySelector('#services').offsetHeight - 2 * 812; return [a - 300, a + 2400]; } },
+  { name: 'Truck + services', note: 'truck left, list right', range: () => { const a = topOf('#services'), h = D().querySelector('#services').offsetHeight - 2 * 812; return [a + 1900, a + h * 0.97]; } },
+  { name: 'Truck → ship', note: 'hand-over', range: () => { const a = topOf('#services'), h = D().querySelector('#services').offsetHeight - 2 * 812; return [a + h * 0.94, a + h + 2 * 812]; } },
+  { name: 'Ship', note: 'ship + why us', range: () => { const a = topOf('#why'), h = D().querySelector('#why').offsetHeight; return [a, a + h - 2.2 * 812]; } },
+  { name: 'Plane', note: 'jet over testimonials', range: () => { const a = topOf('#testimonials'); return [a - 812, a + 2.6 * 812]; } },
+  { name: 'Industries', note: 'compact grid', range: () => { const a = topOf('#industries'), h = D().querySelector('#indGrid').offsetHeight; return [a - 20, a + h - 500]; } },
+];
+const go = () => {
+  if (!cur) return;
+  const [a, b] = cur.range(), t = s.value / 1000, y = a + (b - a) * t;
+  const l = W().lenis || W().__lenis;
+  if (l) l.scrollTo(y, { immediate: true, force: true }); else W().scrollTo(0, y);
+  pct.textContent = Math.round(t * 100) + '%';
+};
+const stop = () => { clearInterval(timer); timer = null; document.getElementById('play').textContent = '▶ Play'; };
+const box = document.getElementById('mods');
+mods.forEach((m) => {
+  const b = document.createElement('button');
+  b.innerHTML = `<b>${m.name}</b><span>${m.note}</span>`;
+  b.onclick = () => { stop(); cur = m; [...box.children].forEach((x) => x.classList.toggle('on', x === b)); s.value = 0; go(); };
+  box.appendChild(b);
+});
+s.oninput = () => { stop(); go(); };
+document.getElementById('back').onclick = () => { stop(); s.value = 0; go(); };
+document.getElementById('play').onclick = () => {
+  if (timer) return stop();
+  document.getElementById('play').textContent = '❚❚ Pause';
+  timer = setInterval(() => { s.value = +s.value + 2; go(); if (+s.value >= 1000) stop(); }, 40);
+};
+f.addEventListener('load', () => { const st = D().createElement('style'); st.textContent = 'html{scrollbar-width:none}html::-webkit-scrollbar{display:none}'; D().head.appendChild(st); });
+f.addEventListener('load', () => setTimeout(() => box.children[0].click(), 7000));
+</script>
+</body>
+</html>
