@@ -1001,4 +1001,6 @@ footer{padding-top:6vw}
   .menu-btn{position:relative}
   .menu-btn::after{content:"";position:absolute;inset:-12px -10px}
   .f-links a{padding:8px 0}
+  .f-links{gap:0 20px;padding-bottom:10px}
+  .f-legal{padding:14px 0 6px}
 }
