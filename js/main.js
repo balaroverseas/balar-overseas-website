@@ -198,8 +198,8 @@ function setupJourney(journey, port) {
     else { panel.append(panelHead, cards); rel.append(relL, relR); col.remove(); }
   };
   place();
-  // ?mob: the phone staging being built (see journey.js): the live scene throughout, on the dark page
-  const mobNew = new URLSearchParams(location.search).has('mob'), sticky = $('.journey-sticky');
+  // the phone staging (see journey.js): its own portrait frames, then the live scene, on the dark page
+  const mobNew = new URLSearchParams(location.search).has('mob') || phone.matches, sticky = $('.journey-sticky');
   // Phones, new staging - the reference's own flow there, read off its page every 150 px at 375x812
   // (all px below are at a 375 px wide screen and scale with the width): the stage is pinned for the
   // first 1478 px (spreader down 520-600, lift 680-780, view tips up 810-930, truck in 1050-1350, box
@@ -410,7 +410,7 @@ const shipWarp = (pos, j) => {
   return { m: shipZ(fj) / zF, dy: (shipY(F) - shipY(fj)) * (2560 / (0.75 * zF)) };
 };
 let SHIP_IN = 1;      // phones: 0 as the ship comes in under the truck -> 1 once it is over it (see the ship player's view)
-const MOB_SEQ = QS.has('mob') && !QS.has('live') && matchMedia('(max-width:759px)').matches;
+const MOB_SEQ = !QS.has('live') && matchMedia('(max-width:759px)').matches;
 async function boot() {
   await Promise.race([document.fonts.ready, wait(2500)]);
   const [globe, journey, port, ship] = await Promise.all([

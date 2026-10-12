@@ -17,7 +17,8 @@ const A_END = 0.42, B_END = 0.71;
 // two lower boxes slide away; the view tips straight up to overhead (box upright on screen, stacker
 // to its right); the truck drives in under the hanging box from the top of the screen; the box is
 // set down; the truck then stays put on screen while the stacker is left behind.
-const MOB = new URLSearchParams(location.search).has('mob');
+// (on for every phone-width screen; ?mob forces it on a wider one for checks)
+const MOB = new URLSearchParams(location.search).has('mob') || matchMedia('(max-width:759px)').matches;
 // metres the lifted box swings along the boom, by reference frames since lift-off (smooth between keys)
 const SWAY = [[0, 0], [8, -0.017], [18, 0], [27, 0.05], [40, 0], [52, -0.021], [66, 0], [78, 0.006], [90, 0]];
 function sway(f) {
