@@ -205,8 +205,12 @@ export function setupReveals() {
   });
   $$('.reveal-words').forEach((el) => {
     const words = $$('.rw', el);
+    // desktop: every word is lit by the time the whole paragraph is in view (its last line 62% down), so
+    // none is still pale when it reaches the middle of the screen, where it is read; it used to finish
+    // only once the paragraph was in the top third
+    const wide = matchMedia('(min-width:760px)').matches;
     ScrollTrigger.create({
-      trigger: el, start: 'top 75%', end: 'bottom 35%',
+      trigger: el, start: wide ? 'top 88%' : 'top 75%', end: wide ? 'bottom 62%' : 'bottom 35%',
       onUpdate: (s) => { const n = Math.round(s.progress * words.length); words.forEach((w, i) => w.classList.toggle('on', i < n)); },
     });
   });
