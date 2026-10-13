@@ -223,7 +223,7 @@ function setupJourney(journey, port) {
     giant.dataset.full ??= giant.textContent;
     giant.textContent = mobNew && phone.matches ? 'Our services' : giant.dataset.full;      // the reference shows the words once there
     if (mobNew && phone.matches) { seqWrap.style.background = 'transparent'; if (!MOB_SEQ) { seqWrap.style.opacity = 0; seqWrap.style.visibility = 'hidden'; } else jCanvas.style.opacity = 0; sticky.style.background = 'linear-gradient(#fff 0 40.6%, #111 40.6%)'; }
-    sec.style.height = mobNew && phone.matches ? `${1478 * K() + col.offsetHeight + 1.4 * VH() + 2 * VH()}px` : '';
+    sec.style.height = mobNew && phone.matches ? `${(1478 + 1623) * K() + col.offsetHeight + 2 * VH()}px` : '';
   };
   fitPhone();
   // (a phone's height-only changes are its bars moving, not a new layout)
@@ -259,10 +259,20 @@ function setupJourney(journey, port) {
         if (mobNew) {
           const span = sec.offsetHeight - 2 * H, d = raw * span, k = K();
           const t = range(P, 0.193, 0.221), dk = t * t * (3 - 2 * t), g = Math.round(255 - 238 * dk);
-          sticky.style.background = `linear-gradient(rgb(${g},${g},${g}) 0 40.6%, #111 40.6%)`;
+          // once the page is dark the stage itself is see-through (the section behind it is dark, and
+          // clear over the ship), so the ship shows under the truck as it comes up
+          sticky.style.background = dk >= 1 ? 'transparent' : `linear-gradient(rgb(${g},${g},${g}) 0 40.6%, #111 40.6%)`;
           if (journey) {
-            const zz = range(d, span - 0.6 * H, span - 0.1 * H); journey.mobZoom = zz * zz * (3 - 2 * zz);
-            const pp = range(d, 2100 * k, span - 0.1 * H); journey.mobPaint = pp * pp * (3 - 2 * pp);
+            // The join with the ship, as the reference runs it on phones (px from this section's top at
+            // 375 wide, E = where the text column has just left the top - 5072 there): the ship first
+            // shows at the bottom at E - 272 and rises at page speed; the truck moves to mid-screen and
+            // shrinks over E + 28 ... E + 628, above the rising ship; the ship then stands still under
+            // it until E + 1623, when the truck leaves upward with this section and the ship starts to
+            // shrink (see setupShip).
+            const E = 1478 * k + H + col.offsetHeight;
+            const zz = range(d, E + 28 * k, E + 628 * k); journey.mobZoom = zz * zz * (3 - 2 * zz);
+            const pp = range(d, 2100 * k, E + 628 * k); journey.mobPaint = pp * pp * (3 - 2 * pp);
+            journey.mobShip = range(d, E - 422 * k, E - 272 * k);       // lane lines fade out before the ship shows
           }
           giant.style.opacity = 1;
           giant.style.transform = `translate(${(15 - Math.min(1299, Math.max(0, d / k - 199))) * k}px,${-Math.max(0, d - 1573 * k)}px)`;
@@ -328,13 +338,17 @@ function setupShip(ship) {
     for (let i = 1; i < PACE.length; i++) if (S <= PACE[i][0]) { const [a, b] = PACE[i - 1], [c, d] = PACE[i]; return b + ((S - a) / (c - a)) * (d - b); }
     return 1;
   };
-  const apply = (S) => {
+  // phones: the ship stands still under the truck for the first 1083 px (at 375 wide) of its pinned
+  // run, as the reference's does; its 4700 px of shrinking start after that
+  const HOLD = 1083, RUN = 4700;
+  const apply = (S0) => {
+    const S = phone.matches ? Math.max(0, (S0 * (HOLD + RUN) - HOLD) / RUN) : S0;
     // Blender frames are spread linearly over the section (frame = 1 + 199·S/0.97)
     ship && ship.setProgress(phone.matches ? pace(S) : Math.min(1, S / 0.97));
     veil.style.opacity = phone.matches ? 0 : 0.6 * range(S, 0.9, 1);   // the reference ends in a pale haze
     const span = sec.offsetHeight - 2.2 * VH();
     const titleMid = 0.5 * VH() - 0.5 * title.offsetHeight;   // title centred at S = 0.7
-    const y = phone.matches ? titleMid - (S - 0.447) * span : titleMid - (S - 0.7) * span * 0.88;
+    const y = phone.matches ? titleMid - (S - 0.447) * span * (RUN / (HOLD + RUN)) : titleMid - (S - 0.7) * span * 0.88;
     flow.style.transform = `translate3d(0,${Math.min(y, VH() + 10)}px,0)`;
     sec.dataset.dynTheme = 'dark';
   };
@@ -343,9 +357,9 @@ function setupShip(ship) {
   apply(0);
   // phones: how far the section still has to rise (see the ship player's view)
   const slide = () => {
-    if (!phone.matches) { SHIP_IN = 1; return; }
-    const v = 1 - range(sec.getBoundingClientRect().top, 0, 0.32 * VH());
-    if (v !== SHIP_IN) { SHIP_IN = v; ship && ship.redraw(); }
+    // (the frame used to be drawn a bay higher while the section slid up over the truck; now the truck
+    // rides above the ship and stays on it, so the frame simply stands where it will be held)
+    SHIP_IN = 1;
   };
   slide();
   ScrollTrigger.create({ trigger: sec, start: 'top bottom', end: 'top top', onUpdate: slide, onLeave: slide, onRefresh: slide });

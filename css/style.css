@@ -1029,3 +1029,11 @@ footer{padding-top:6vw}
 @media (max-width:759px){
   .ship{height:calc(1253.3vw + 220vh);height:calc(1253.3vw + 220svh)}
 }
+
+/* phones: the join with the ship as the reference runs it. The ship section starts 1895 px (at 375
+   wide) before this one ends and lies under it: this section is dark down to where the ship begins and
+   clear from there, so the ship rises into view under the truck, which stays on top of it. */
+@media (max-width:759px){
+  .journey.mob-new{z-index:5;background:linear-gradient(to bottom,#111 0,#111 calc(100% - 505.33vw),transparent calc(100% - 505.33vw))}
+  .ship{margin-top:-505.33vw;height:calc(1542.1vw + 220vh);height:calc(1542.1vw + 220svh)}
+}

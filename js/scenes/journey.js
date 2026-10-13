@@ -208,7 +208,7 @@ export function initJourney(canvas, onSpeed) {
     strip.position.set(HERO_X, 0.004, zm);
     const mk = [];
     for (const dx of [-1.9, 1.9]) for (let z = z0; z - 2.4 > z1; z -= 6.6) mk.push([HERO_X + dx, z - 1.2, 0.22, 2.4]);
-    const lanes = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#3a3a3a', toneMapped: false }), mk.length);
+    const lanes = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#3a3a3a', toneMapped: false, transparent: true }), mk.length);
     const mm = new THREE.Matrix4(), q0 = new THREE.Quaternion();
     mk.forEach(([x, z, w, l], i) => lanes.setMatrixAt(i, mm.compose(new THREE.Vector3(x, 0.03, z), q0, new THREE.Vector3(w, 1, l))));
     // one group, switched as a whole (the exporter swaps the instanced lanes for a plain mesh)
@@ -457,7 +457,7 @@ export function initJourney(canvas, onSpeed) {
       stack.forEach((s) => { s.userData.x0 ??= s.position.x; s.position.x = s.userData.x0 + sl; });
       slab.visible = junction.visible = false;
       // not while the camera stands below ground level in the side view (a path tracer draws their undersides)
-      mobRoad.forEach((o) => { o.visible = P >= 0.203; });
+      mobRoad.forEach((o) => { o.visible = P >= 0.203 && api.mobShip < 1; o.children[0].material.opacity = 1 - api.mobShip; });   // gone before the ship comes up under the truck
     }
     white.visible = !MOB && P > B_END;
     shadowCatcher.visible = P < A_END + 0.05 || P > B_END;
@@ -543,7 +543,7 @@ export function initJourney(canvas, onSpeed) {
       const hS = 8.333 / camera.aspect, k = ease(seg(P, 0.193, 0.221)), z = api.mobZoom;
       const fx = lerp(lerp(0.32, 0.19, ease(seg(P, 0.238, 0.286))), 0.137, ease(seg(P, 0.30, 0.352)));
       const bz = P < 0.352 ? ZP : tz + 1.1;
-      mLook.set(lerp(HERO_X - (0.5 - fx) * 16.667, tx, z), 1.5, lerp(bz - 0.23 * 2 * hS, tz, z));
+      mLook.set(lerp(HERO_X - (0.5 - fx) * 16.667, tx, z), 1.5, lerp(bz - 0.23 * 2 * hS, tz + api.joinDz, z));
       mLook.set(lerp(HERO_X - 0.17 * 16.667, mLook.x, k), lerp(-0.188 * hS, mLook.y, k), lerp(ZP, mLook.z, k));
       camera.quaternion.slerpQuaternions(qS, qT, k);
       mDir.set(0, 0, -1).applyQuaternion(camera.quaternion);
@@ -564,7 +564,7 @@ export function initJourney(canvas, onSpeed) {
     // on resuming it jumps straight to where the page is
     pause(v) { if (stage.paused && !v) snap = true; stage.paused = v; },
     step() { stage.onFrame(performance.now() / 1000, 0); },      // one update by hand (dev export in a hidden tab)
-    debugCam: null, mobZoom: 0, mobPaint: 0,
+    debugCam: null, mobZoom: 0, mobPaint: 0, mobShip: 0, joinDz: 6.6,      // metres the truck is set up-screen of centre at the join, so its box lies on a bay of the ship
     camera, scene, truck, box, rig, renderer: stage.renderer,
   };
   return api;
