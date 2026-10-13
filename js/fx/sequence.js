@@ -15,7 +15,7 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contai
       const img = new Image();
       img.decoding = 'async';
       img.onload = () => { frames[i] = img; if (Math.abs(i - current) < 3) draw(); if (cache && Math.abs(i - current) <= cache * 2) tend(); res(); };
-      img.onerror = () => { frames[i] = null; res(); };
+      img.onerror = () => { frames[i] = undefined; res(); };      // (not null: it is not asked for again)
       img.src = url(i);
     });
   }
@@ -33,11 +33,15 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contai
   // frames around the current one are decoded ahead of time and held as bitmaps (a few each side,
   // more in the direction of travel); the ones left behind are released.
   const bitmaps = new Map(), pending = new Set();
-  let dirSign = 1;
+  let dirSign = 1, lastW = 0;
   const hold = (i) => {
     if (i < from || i >= count || bitmaps.has(i) || pending.has(i) || !frames[i] || !window.createImageBitmap) return;
     pending.add(i);
-    createImageBitmap(frames[i]).then((b) => {
+    // (a frame larger than it is drawn is decoded straight to the drawn size: less memory, and the same
+    // pixels on screen)
+    const im = frames[i], tw = Math.ceil(lastW);
+    const opt = tw > 0 && tw < im.width ? { resizeWidth: tw, resizeHeight: Math.round((tw * im.height) / im.width), resizeQuality: 'high' } : undefined;
+    (opt ? createImageBitmap(im, opt) : createImageBitmap(im)).then((b) => {
       pending.delete(i);
       if (Math.abs(i - current) > cache * 2 + 2) { b.close(); return; }
       bitmaps.set(i, b);
@@ -83,6 +87,7 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contai
       x = ax + (x - ax) * v.s + v.dx; y = ay + (y - ay) * v.s + v.dy; w *= v.s; h *= v.s;
       clipW = v.clip ? w * v.clip : 0;
     }
+    lastW = w * dpr;
     if (shadow) {
       // soft drop shadow from the frame's own alpha (e.g. the jet over the page)
       g.save();
@@ -125,6 +130,21 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contai
   }
 
   new ResizeObserver(resize).observe(canvas);
+  // Loading: the first frame, then every sixth (so any position has something close to show), then the
+  // rest - six at a time, always the missing frame nearest to where the page is now (ahead first), so
+  // a visitor who scrolls on, or jumps, gets the frames around them before the ones far away. (They
+  // used to come strictly one after another from the start.)
+  const nextNeeded = () => {
+    for (let d = 0; d < count; d++) {
+      const a = current + d, b = current - d;
+      if (a >= from && a < count && frames[a] === null) return a;
+      if (b >= from && b < count && frames[b] === null) return b;
+    }
+    return -1;
+  };
+  const fill = () => Promise.all(Array.from({ length: 6 }, async () => {
+    for (let i = nextNeeded(); i >= 0; i = nextNeeded()) await load(i);
+  }));
   let ready = null;
   function start() {
     ready = ready || load(from).then(async () => {
@@ -132,19 +152,23 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contai
       const coarse = [];
       for (let i = from; i < count; i += 6) coarse.push(load(i));
       await Promise.all(coarse);
-      for (let i = from; i < count; i++) await load(i);
+      await fill();
     });
     return ready;
   }
   if (!lazy) start();
+  let firstF = null;      // where it was first asked to stand
 
   return {
     get ready() { return start(); },
     load: start,
     redraw: () => draw(),
     setProgress(p) {
-      start();
       const f = Math.max(from, Math.min(count - 1, p * (count - 1)));
+      // a lazy sequence fetches only the frame it is asked to show until load() is called, or until
+      // it is actually being moved through
+      if (firstF === null) firstF = f;
+      if (!lazy || Math.abs(f - firstF) > 1.5) start();
       const i = blend ? Math.min(count - 1, Math.floor(f)) : Math.round(f);
       const fr = blend ? f - i : 0;
       if (i === current && Math.abs(fr - frac) < 0.004) return;

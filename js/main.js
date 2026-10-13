@@ -480,7 +480,7 @@ async function boot() {
         return { s: 1, dx: 0, dy: (0.406 + (0.27 - 0.406) * k - 0.5) * (H - h) };
       },
     } : {
-      dir: 'seq/port', count: 120, fit: 'width',
+      dir: 'seq/port', count: 120, fit: 'width', cache: 4,
       // The frames were rendered through the live camera on a 16:9 screen. That camera keeps the
       // ground at a fixed share of the screen height (about 90% down while the stacker works, 40%
       // once the truck pulls away), so on any other screen shape the frame is slid up or down to
@@ -510,7 +510,7 @@ async function boot() {
       // on an upright screen the frames come from seq/ship_m - the same frames cut to their middle
       // 1000 px, which is all such a screen can show (a wider phone-width window keeps the full ones)
       dir: SHIP_PHONE && innerWidth / innerHeight <= 0.6 ? 'seq/ship_m' : 'seq/ship', from: SHIP_PHONE ? 60 : 0,
-      count: 100, fit: 'cover', lazy: true, blend: SHIP_PHONE, warp: shipWarp, cache: SHIP_PHONE ? 5 : 0,
+      count: 100, fit: 'cover', lazy: true, blend: SHIP_PHONE, warp: shipWarp, cache: SHIP_PHONE ? 5 : 4,
       view: ({ h, W, H }) => {
         if (W >= 760) return { s: 1, dx: 0, dy: 0 };
         return { s: 1, dx: 0, dy: -0.234 * h * (1 - SHIP_IN) };
@@ -525,7 +525,10 @@ async function boot() {
   setupShip(ship);
   setupPlane();
   // fetch the ship and jet frames a few screens before they are needed
+  // the ship's frames wait until the stacker's are in (or the visitor is getting near the ship), so the
+  // two do not compete for the connection while the page is still at the top
   ScrollTrigger.create({ trigger: '#why', start: 'top 400%', once: true, onEnter: () => ship.load() });
+  port && port.ready.then(() => ship && ship.load());
   setupCurves();
   setupReveals();
   setupFooter();
