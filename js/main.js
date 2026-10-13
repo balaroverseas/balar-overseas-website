@@ -318,7 +318,12 @@ function setupShip(ship) {
   // (hull width on a 375 px screen, read off a contact sheet of the frames: f64 70%, f68 58%, f72 50%,
   // f78 40%, f82 27%, f86 16%, f88 13%, f96 9%; the reference: 67% from the moment the ship comes in
   // under the truck until 0.43, then 40% at 0.53, 27% at 0.64, 17% at 0.74, 13% at 0.85, 9% at 0.96)
-  const PACE = [[0, 0.625], [0.43, 0.657], [0.53, 0.778], [0.64, 0.818], [0.74, 0.854], [0.85, 0.879], [0.96, 0.96], [1, 1]];
+  // (re-measured on the live reference, every 400 px of its 4700 px phone section: ship width 275 px
+  // at 0, 264 @800, 249 @1200, 227 @1600, 198 @2000, 162 @2400, 126 @2800, 97 @3200, 75 @3600, 48 @4000,
+  // 36 @4400; its text block rides at page speed, heading mid-screen at 2100 px. Our hull is
+  // 105.7 / cam_z of the screen width, which gives the frame for each of those widths; the first point
+  // stays on the frame the truck hands over to.)
+  const PACE = [[0, 0.625], [0.17, 0.635], [0.255, 0.646], [0.34, 0.661], [0.426, 0.689], [0.511, 0.755], [0.596, 0.799], [0.681, 0.823], [0.766, 0.847], [0.851, 0.906], [0.936, 1], [1, 1]];
   const pace = (S) => {
     for (let i = 1; i < PACE.length; i++) if (S <= PACE[i][0]) { const [a, b] = PACE[i - 1], [c, d] = PACE[i]; return b + ((S - a) / (c - a)) * (d - b); }
     return 1;
@@ -329,7 +334,7 @@ function setupShip(ship) {
     veil.style.opacity = phone.matches ? 0 : 0.6 * range(S, 0.9, 1);   // the reference ends in a pale haze
     const span = sec.offsetHeight - 2.2 * VH();
     const titleMid = 0.5 * VH() - 0.5 * title.offsetHeight;   // title centred at S = 0.7
-    const y = titleMid - (S - (phone.matches ? 0.62 : 0.7)) * span * 0.88;
+    const y = phone.matches ? titleMid - (S - 0.447) * span : titleMid - (S - 0.7) * span * 0.88;
     flow.style.transform = `translate3d(0,${Math.min(y, VH() + 10)}px,0)`;
     sec.dataset.dynTheme = 'dark';
   };

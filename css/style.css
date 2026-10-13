@@ -1023,3 +1023,9 @@ footer{padding-top:6vw}
   /* and its paragraph stands on white from its first line (it used to come in over the glow) */
   .intro{background:linear-gradient(180deg,rgba(255,255,255,0) 0,#fff 16vh);padding-top:17vh}
 }
+
+/* phones: the ship section is as long as the reference's there - 4700 px of travel on a 375 px
+   screen (12.53 screen widths) before the testimonials come over it; ours ran 6090 px */
+@media (max-width:759px){
+  .ship{height:calc(1253.3vw + 220vh);height:calc(1253.3vw + 220svh)}
+}
