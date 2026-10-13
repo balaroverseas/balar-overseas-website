@@ -467,7 +467,7 @@ export function initJourney(canvas, onSpeed) {
       stack.forEach((s) => { s.userData.x0 ??= s.position.x; s.position.x = s.userData.x0 + sl; });
       slab.visible = junction.visible = false;
       // not while the camera stands below ground level in the side view (a path tracer draws their undersides)
-      mobRoad.forEach((o) => { o.visible = P >= 0.203 && api.mobShip < 1; o.children[0].material.opacity = 1 - api.mobShip; });   // gone before the ship comes up under the truck
+      mobRoad.forEach((o) => { o.visible = P >= 0.203; });
     }
     white.visible = !MOB && P > B_END;
     shadowCatcher.visible = P < A_END + 0.05 || P > B_END;
@@ -575,7 +575,7 @@ export function initJourney(canvas, onSpeed) {
     pause(v) { if (stage.paused && !v) snap = true; stage.paused = v; },
     step() { stage.onFrame(performance.now() / 1000, 0); },
     frame() { stage.frame(); },      // one update by hand (dev export in a hidden tab)
-    debugCam: null, mobZoom: 0, mobPaint: 0, mobShip: 0, joinDz: 6.6,      // metres the truck is set up-screen of centre at the join, so its box lies on a bay of the ship
+    debugCam: null, mobZoom: 0, mobPaint: 0, mobShip: 0, joinDz: 0,
     camera, scene, truck, box, rig, renderer: stage.renderer,
   };
   return api;
