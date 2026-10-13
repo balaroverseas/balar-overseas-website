@@ -237,6 +237,14 @@ function setupJourney(journey, port) {
     onUpdate: (s) => {
       const raw = s.progress, H = VH(), mob = phone.matches;
       let P = raw, P0 = 0, Pb = 0;
+      if (!mob) {
+        // Desktop: the stacker used to stand with its spreader over the box for the first 1.72 screens
+        // of this section; on the reference (followed there frame by frame at 1920x911) it starts down
+        // after 1.0 screen. That wait is now 1.04 screens, and everything after it runs at the pace it
+        // had (the section is 0.68 screen shorter - see .journey in style.css).
+        const dS = (raw * (sec.offsetHeight - 2 * H)) / H;
+        P = dS <= 1.04 ? (0.12 * dS) / 1.04 : Math.min(1, 0.12 + (dS - 1.04) / 14.32);
+      }
       if (mob) {
         // the scene is run through faster (up to the top view on the last road, 0.9) so that the
         // rest of the section is left for the column, which ends its travel at 0.95

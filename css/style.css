@@ -1042,5 +1042,5 @@ footer{padding-top:6vw}
    through, and the stage comes up under it; the figures sit on the right, the stacker on the left. */
 @media (min-width:760px){
   .intro{background:linear-gradient(180deg,rgba(255,255,255,0) 0,#fff 55vh,#fff calc(100% - 23.4vw),rgba(255,255,255,0) calc(100% - 23.4vw))}
-  .journey{margin-top:-23.4vw}
+  .journey{margin-top:-23.4vw;height:1564vh}      /* 1632vh less the 0.68 screen of standing still taken out in main.js */
 }
