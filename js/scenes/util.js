@@ -325,17 +325,20 @@ export function createStage(canvas, opts = {}) {
   new IntersectionObserver(([e]) => { stage.visible = e.isIntersecting; }, { rootMargin: '150px' }).observe(canvas);
 
   const clock = new THREE.Clock();
-  renderer.setAnimationLoop(() => {
+  const frame = () => {
     const dt = Math.min(clock.getDelta(), 0.05);
     if (!stage.visible || stage.paused) return;      // off-screen, or covered (see journey.pause)
     // one bad frame must never stop the scene: report once and keep looping
     try {
       if (stage.onFrame) stage.onFrame(clock.elapsedTime, dt);
+      if (stage.skip) { stage.skip = false; return; }      // nothing changed since the last frame drawn
       renderer.render(scene, camera);
     } catch (err) {
       if (!stage.failed) { stage.failed = true; console.error('[3D] frame error', err); window.__sceneError = String(err && err.stack || err); }
     }
-  });
+  };
+  renderer.setAnimationLoop(frame);
+  stage.frame = frame;      // one pass of the loop by hand (checks in a tab that is not being shown)
   return stage;
 }
 

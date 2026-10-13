@@ -320,9 +320,19 @@ export function initJourney(canvas, onSpeed) {
   const sunUp = sunDir.clone().cross(sunRight).normalize();
   const focus = new THREE.Vector3();
 
+  // phones: this scene is a pure function of the scroll position (nothing in it runs on the clock), so a
+  // frame is drawn only when that has moved - with the page at rest the phone has nothing to draw. One
+  // frame a second is still drawn in case a model has just finished loading.
+  let drawnKey = '', drawnAt = 0;
   stage.onFrame = (t, dt) => {
     P = snap ? target : THREE.MathUtils.damp(P, target, 7, dt);
+    if (Math.abs(P - target) < 1e-5) P = target;
     snap = false;
+    if (MOB && dt > 0) {
+      const key = `${P.toFixed(5)}|${api.mobZoom.toFixed(4)}|${api.mobPaint.toFixed(4)}|${api.mobShip.toFixed(3)}|${stage.width}x${stage.height}`;
+      if (key === drawnKey && t - drawnAt < 1) { stage.skip = true; return; }
+      drawnKey = key; drawnAt = t;
+    }
     const a = range(P, 0, A_END), b = range(P, A_END, B_END), c = range(P, B_END, 1);
 
     // ---------------- reach stacker + box (phase A), timings measured off the reference:
@@ -563,7 +573,8 @@ export function initJourney(canvas, onSpeed) {
     // phones: while the rendered frames cover the scene nothing of it shows, so it is not drawn at all;
     // on resuming it jumps straight to where the page is
     pause(v) { if (stage.paused && !v) snap = true; stage.paused = v; },
-    step() { stage.onFrame(performance.now() / 1000, 0); },      // one update by hand (dev export in a hidden tab)
+    step() { stage.onFrame(performance.now() / 1000, 0); },
+    frame() { stage.frame(); },      // one update by hand (dev export in a hidden tab)
     debugCam: null, mobZoom: 0, mobPaint: 0, mobShip: 0, joinDz: 6.6,      // metres the truck is set up-screen of centre at the join, so its box lies on a bay of the ship
     camera, scene, truck, box, rig, renderer: stage.renderer,
   };

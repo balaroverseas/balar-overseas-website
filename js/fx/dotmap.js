@@ -80,7 +80,15 @@ export async function drawDotMap(canvas, opts = {}) {
   build();
   new ResizeObserver(() => { build(); draw(); }).observe(canvas);
   let raf = 0;
-  const loop = (t) => { draw(t); raf = requestAnimationFrame(loop); };
+  // only while it can be seen: checked a few times a second (hidden with its loader, scrolled away, or
+  // the tab in the background - the loader's map used to go on redrawing behind the page for good)
+  let shown = true, tickN = 0, inView = true;
+  new IntersectionObserver(([e]) => { inView = e.isIntersecting; }).observe(canvas);
+  const loop = (t) => {
+    if (tickN++ % 20 === 0) shown = inView && !document.hidden && canvas.getClientRects().length > 0 && getComputedStyle(canvas).visibility !== 'hidden';
+    if (shown) draw(t);
+    raf = requestAnimationFrame(loop);
+  };
   if (flicker) raf = requestAnimationFrame(loop); else draw();
 
   return {

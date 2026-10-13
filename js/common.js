@@ -134,7 +134,14 @@ export function initCommon({ startStopped = false } = {}) {
   const head = $('.site-head');
   head.classList.add('at-top');
   let lastY = 0;
+  // (a hit-test through every layer under the header: run a few times a second, not on every scroll
+  // step - with one more when the scrolling stops)
+  let probeAt = 0, probeLater = 0;
   const themeProbe = () => {
+    const now = performance.now();
+    clearTimeout(probeLater);
+    if (now - probeAt < 120) { probeLater = setTimeout(themeProbe, 130); return; }
+    probeAt = now;
     const probe = document.elementsFromPoint(innerWidth / 2, 80).find((el) => el.closest('[data-theme]') && !el.closest('.site-head') && !el.closest('.pt'));
     const sec = probe && probe.closest('[data-theme]');
     if (sec) head.dataset.theme = sec.dataset.dynTheme || sec.dataset.theme;
@@ -151,6 +158,40 @@ export function initCommon({ startStopped = false } = {}) {
     },
   });
   requestAnimationFrame(themeProbe);
+
+  // Mono labels (nav, buttons, small links) shuffle their own letters on hover and settle from the left
+  // in about half a second, like the reference's. One text node per label; the font is monospaced, so
+  // the label keeps its width while it runs. Mouse only.
+  if (finePointer && !reduceMotion) {
+    const pick = (el) => {
+      if (el._shNode !== undefined) return el._shNode;
+      const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      const nodes = [];
+      for (let n = w.nextNode(); n; n = w.nextNode()) if (n.nodeValue.trim().length > 1) nodes.push(n);
+      const n = nodes.length === 1 && /mono/i.test(getComputedStyle(nodes[0].parentElement).fontFamily) ? nodes[0] : null;
+      return (el._shNode = n);
+    };
+    document.addEventListener('mouseover', (e) => {
+      const el = e.target.closest && e.target.closest('a,button');
+      if (!el || (e.relatedTarget && el.contains(e.relatedTarget))) return;
+      const node = pick(el);
+      if (!node || node._busy) return;
+      node._busy = true;
+      const orig = node.nodeValue, chars = [...orig], n = chars.length, steps = Math.min(12, Math.max(7, Math.round(n / 2)));
+      let i = 0;
+      const tick = () => {
+        i++;
+        if (i >= steps) { node.nodeValue = orig; node._busy = false; return; }
+        const done = Math.floor((i / steps) * n);
+        const rest = chars.slice(done).filter((c) => c.trim());
+        for (let k = rest.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [rest[k], rest[j]] = [rest[j], rest[k]]; }
+        let r = 0;
+        node.nodeValue = chars.map((c, k) => (k < done || !c.trim() ? c : rest[r++])).join('');
+        setTimeout(tick, 55);
+      };
+      tick();
+    });
+  }
 
   // Cursor
   if (finePointer && !reduceMotion) {
@@ -179,6 +220,10 @@ export function initCommon({ startStopped = false } = {}) {
     addEventListener('resize', fit);
     setTimeout(fit, 1500);
   }
+
+  // endless decorative animations run only while their element is on screen
+  const rest = new IntersectionObserver((es) => es.forEach((e) => { e.target.style.animationPlayState = e.isIntersecting ? 'running' : 'paused'; }), { rootMargin: '100px' });
+  $$('.intro-media img, .rings i, .f-track, .cycle-track, .route-dash').forEach((el) => rest.observe(el));
 
   // Keep trigger positions right when late images change the page height
   let refreshTimer = 0, lastH = 0;
