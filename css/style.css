@@ -1035,3 +1035,12 @@ footer{padding-top:6vw}
 @media (max-width:759px){
   .ship{height:calc(1306.67vw + 220vh);height:calc(1306.67vw + 220svh)}
 }
+
+/* desktop: on the reference the stacker stage starts under the tail of the intro - it is pinned while
+   the last figure is still leaving (0.25 screen of it) - so it is reached about 0.4 screen sooner than
+   ours was (services top at 1920x1080: 3695 px there, 4145 px here). The intro's last 23.4vw is see-
+   through, and the stage comes up under it; the figures sit on the right, the stacker on the left. */
+@media (min-width:760px){
+  .intro{background:linear-gradient(180deg,rgba(255,255,255,0) 0,#fff 55vh,#fff calc(100% - 23.4vw),rgba(255,255,255,0) calc(100% - 23.4vw))}
+  .journey{margin-top:-23.4vw}
+}
