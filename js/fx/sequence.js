@@ -105,13 +105,15 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contai
     const next = blend && at === current && frames[current + 1] ? pic(current + 1) : null;
     if (next && warp) {
       const k = w / img.width, cx = x + w / 2, cy = y + h / 2, pos = current + frac;
-      const put = (im, j) => {
-        const v = warp(pos, j);
-        g.drawImage(im, cx - (w * v.m) / 2, cy - (h * v.m) / 2 + v.dy * k, w * v.m, h * v.m);
-      };
-      put(next, current + 1);
+      const vN = warp(pos, current + 1), vC = warp(pos, current);
+      const put = (im, v) => g.drawImage(im, cx - (w * v.m) / 2 + (v.dx || 0) * k, cy - (h * v.m) / 2 + v.dy * k, w * v.m, h * v.m);
+      // where the camera is closing in or gliding, the next frame as re-drawn does not reach every edge:
+      // this one is then laid down first so no strip is left bare
+      const full = vN.m >= 1 && Math.abs(vN.dy) * k <= ((vN.m - 1) * h) / 2 + 0.5 && Math.abs(vN.dx || 0) * k <= ((vN.m - 1) * w) / 2 + 0.5;
+      if (!full) put(src, vC);
+      put(next, vN);
       g.globalAlpha = 1 - frac;
-      put(src, current);
+      put(src, vC);
       g.globalAlpha = 1;
     } else {
       g.drawImage(src, x, y, w, h);

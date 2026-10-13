@@ -457,9 +457,10 @@ const shipZ = (f) => {
 const shipSm = (f, a, b) => { const u = Math.min(1, Math.max(0, (f - a) / (b - a))); return u * u * (3 - 2 * u); };
 const shipY = (f) => { const y = -16 + 48 * shipSm(f, 1, 75); return y + (6 - y) * shipSm(f, 75, 136); };
 const shipT = (i) => 1 + (i * 199) / 99;
+const shipX = (f) => -0.15 * (1 - shipSm(f, 1, 40));
 const shipWarp = (pos, j) => {
-  const F = shipT(pos), fj = Math.round(shipT(j)), zF = shipZ(F);
-  return { m: shipZ(fj) / zF, dy: (shipY(F) - shipY(fj)) * (2560 / (0.75 * zF)) };
+  const F = shipT(pos), fj = Math.round(shipT(j)), zF = shipZ(F), ppm = 2560 / (0.75 * zF);
+  return { m: shipZ(fj) / zF, dy: (shipY(F) - shipY(fj)) * ppm, dx: (shipX(fj) - shipX(F)) * ppm };
 };
 const SHIP_PHONE = matchMedia('(max-width:759px)').matches;
 let SHIP_IN = 1;      // phones: 0 as the ship comes in under the truck -> 1 once it is over it (see the ship player's view)
@@ -510,7 +511,9 @@ async function boot() {
       // on an upright screen the frames come from seq/ship_m - the same frames cut to their middle
       // 1000 px, which is all such a screen can show (a wider phone-width window keeps the full ones)
       dir: SHIP_PHONE && innerWidth / innerHeight <= 0.6 ? 'seq/ship_m' : 'seq/ship', from: SHIP_PHONE ? 60 : 0,
-      count: 100, fit: 'cover', lazy: true, blend: SHIP_PHONE, warp: shipWarp, cache: SHIP_PHONE ? 5 : 4,
+      // (every screen: the ship is drawn from each frame's own camera, so it glides between the 100
+      // frames instead of stepping from one to the next every ~70 px of scroll)
+      count: 100, fit: 'cover', lazy: true, blend: true, warp: shipWarp, cache: SHIP_PHONE ? 5 : 4,
       view: ({ h, W, H }) => {
         if (W >= 760) return { s: 1, dx: 0, dy: 0 };
         return { s: 1, dx: 0, dy: -0.234 * h * (1 - SHIP_IN) };
