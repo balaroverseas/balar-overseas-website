@@ -42,20 +42,25 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', avif = false,
   // frames around the current one are decoded ahead of time and held as bitmaps (a few each side,
   // more in the direction of travel); the ones left behind are released.
   const bitmaps = new Map(), pending = new Set();
-  let dirSign = 1, lastW = 0;
+  let dirSign = 1, lastW = 0, noBitmaps = false;
   const hold = (i) => {
-    if (i < from || i >= count || bitmaps.has(i) || pending.has(i) || !frames[i] || !window.createImageBitmap) return;
+    if (noBitmaps || i < from || i >= count || bitmaps.has(i) || pending.has(i) || !frames[i] || !window.createImageBitmap) return;
+    if (pending.size >= 2) return;     // two at a time (each one finished asks for the next, see below)
     pending.add(i);
     // (a frame larger than it is drawn is decoded straight to the drawn size: less memory, and the same
     // pixels on screen)
     const im = frames[i], tw = Math.ceil(lastW);
     const opt = tw > 0 && tw < im.width ? { resizeWidth: tw, resizeHeight: Math.round((tw * im.height) / im.width), resizeQuality: 'high' } : undefined;
-    (opt ? createImageBitmap(im, opt) : createImageBitmap(im)).then((b) => {
+    // (made from the file's bytes - already in the browser's cache - not from the <img>: from an <img>
+    // the bitmap is made on the page's own thread, 16-40 ms a frame even on a fast PC, and six at once
+    // froze the page as the ship came in; from the bytes it is decoded in the background)
+    fetch(im.src).then((r) => r.blob()).then((blob) => (opt ? createImageBitmap(blob, opt) : createImageBitmap(blob))).then((b) => {
       pending.delete(i);
-      if (Math.abs(i - current) > cache * 2 + 2) { b.close(); return; }
+      if (Math.abs(i - current) > cache * 2 + 2) { b.close(); tend(); return; }
       bitmaps.set(i, b);
       if (i === current || i === current + 1) draw();
-    }).catch(() => { pending.delete(i); });
+      tend();
+    }).catch(() => { pending.delete(i); noBitmaps = true; });     // (a browser that cannot: frames are drawn from the <img>s)
   };
   const tend = () => {
     if (!cache) return;
