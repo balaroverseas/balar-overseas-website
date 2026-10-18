@@ -32,7 +32,11 @@ export function loadGLB(url) {
  * and its WHEEL_* nodes take over the wheel spin. If loading fails the procedural truck stays.
  */
 export function upgradeTruck(truck) {
-  return loadGLB('assets/models/truck.glb').then((src) => {
+  // phones: the same truck at a third of the triangles (blender/truck_lite.py) - it was 9/10 of what a
+  // phone draws in the live scene (?fulltruck: the full one)
+  const qs = new URLSearchParams(location.search);
+  const lite = matchMedia('(max-width:759px)').matches && !qs.has('fulltruck') && !qs.has('hq');
+  return loadGLB(lite ? 'assets/models/truck_m.glb' : 'assets/models/truck.glb').then((src) => {
     const model = src.clone(true);
     model.position.x = -1.1;
     const wheels = [];
