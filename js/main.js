@@ -475,13 +475,13 @@ async function boot() {
     // 375x812 - drawn across the width, with the ground line / box centre kept where that camera puts them
     // on a screen of another shape: 40.6% down in the side view, 27% once overhead)
     sequencePlayer($('#stackSeq'), MOB_SEQ ? {
-      dir: 'seq/port_ms', count: 240, fit: 'width', cache: 9,      // (port_ms = the 1125 px renders of seq/port_mf2 at 750 px, what a phone draws)
+      dir: 'seq/port_ms', count: 240, fit: 'width', cache: 9, lazy: true,      // (port_ms = the 1125 px renders of seq/port_mf2 at 750 px, what a phone draws)
       view: ({ h, H, frame }) => {
         const u = range((frame / 239) * 0.5, 0.193, 0.221), k = u * u * (3 - 2 * u);
         return { s: 1, dx: 0, dy: (0.406 + (0.27 - 0.406) * k - 0.5) * (H - h) };
       },
     } : {
-      dir: 'seq/port', count: 120, fit: 'width', cache: 4,
+      dir: 'seq/port', avif: true, count: 120, fit: 'width', cache: 4, lazy: true,
       // The frames were rendered through the live camera on a 16:9 screen. That camera keeps the
       // ground at a fixed share of the screen height (about 90% down while the stacker works, 40%
       // once the truck pulls away), so on any other screen shape the frame is slid up or down to
@@ -531,7 +531,9 @@ async function boot() {
   // the ship's frames wait until the stacker's are in (or the visitor is getting near the ship), so the
   // two do not compete for the connection while the page is still at the top
   ScrollTrigger.create({ trigger: '#why', start: 'top 400%', once: true, onEnter: () => ship.load() });
-  port && port.ready.then(() => ship && ship.load());
+  // the stacker's frames start once the loader has gone (or as soon as the visitor scrolls into them):
+  // while it runs, the connection goes to what the loader waits for - the 3-D models and the globe
+  const framesIn = () => port && port.load().then(() => ship && ship.load());
   setupCurves();
   setupReveals();
   setupFooter();
@@ -546,6 +548,7 @@ async function boot() {
     paintIn([$('.hero .kicker'), $('.hero-copy h1'), $('.hero-copy p')], 0.3);
     gsap.from('.hero .cta-row', { y: 24, opacity: 0, duration: 1, ease: 'power3.out', delay: 0.3 });
     ScrollTrigger.refresh();
+    framesIn();
   }).eventCallback('onComplete', () => { pre.remove(); sessionStorage.setItem('bo-loaded', '1'); });
 }
 boot();

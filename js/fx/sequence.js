@@ -2,11 +2,16 @@
 // Frames load progressively: first frame, then a coarse pass, then everything else,
 // so scrubbing works immediately and sharpens as frames arrive. With `lazy`, nothing
 // loads until load() or the first setProgress().
-export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contain', align = 'center', bleed = 0, anchor = null, onLayout = null, lazy = false, shadow = null, scaleAt = null, blend = false, warp = null, from = 0, cache = 0, view = null }) {
+import { avifOK } from './avif.js';
+
+export function sequencePlayer(canvas, { dir, count, ext = 'webp', avif = false, fit = 'contain', align = 'center', bleed = 0, anchor = null, onLayout = null, lazy = false, shadow = null, scaleAt = null, blend = false, warp = null, from = 0, cache = 0, view = null }) {
   const g = canvas.getContext('2d');
   const frames = new Array(count).fill(null);
   let current = from, frac = 0, W = 0, H = 0, dpr = 1;
-  const url = (i) => `${dir}/f${String(i + 1).padStart(3, '0')}.${ext}`;
+  // avif: the folder also holds AVIF copies of the frames (smaller); used where the browser shows AVIF
+  let fmt = ext;
+  const fmtReady = avif ? avifOK.then((ok) => { if (ok) fmt = 'avif'; }) : Promise.resolve();
+  const url = (i) => `${dir}/f${String(i + 1).padStart(3, '0')}.${fmt}`;
 
   function load(i) {
     if (i < from || frames[i] !== null) return Promise.resolve();   // (frames before `from` are never shown: not fetched)
@@ -15,8 +20,12 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', fit = 'contai
       const img = new Image();
       img.decoding = 'async';
       img.onload = () => { frames[i] = img; if (Math.abs(i - current) < 3) draw(); if (cache && Math.abs(i - current) <= cache * 2) tend(); res(); };
-      img.onerror = () => { frames[i] = undefined; res(); };      // (not null: it is not asked for again)
-      img.src = url(i);
+      img.onerror = () => {
+        // (a frame without an AVIF copy falls back to its WebP)
+        if (fmt !== ext && !img.src.endsWith(ext)) { img.src = img.src.replace(/\.avif$/, '.' + ext); return; }
+        frames[i] = undefined; res();                               // (not null: it is not asked for again)
+      };
+      fmtReady.then(() => { img.src = url(i); });
     });
   }
 

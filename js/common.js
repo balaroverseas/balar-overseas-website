@@ -2,6 +2,7 @@
 // reveals, curved section hand-offs, footer effects and page-to-page transitions.
 import { drawDotMap } from './fx/dotmap.js';
 import { particleText } from './fx/particles.js';
+import { avifPhotos } from './fx/avif.js';
 
 const { gsap, ScrollTrigger } = window;
 gsap.registerPlugin(ScrollTrigger);
@@ -80,6 +81,7 @@ export function initCommon({ startStopped = false } = {}) {
   if (yr) yr.textContent = new Date().getFullYear();
   $$('.split').forEach((el) => splitWords(el));
   $$('.reveal-words').forEach((el) => splitWords(el, 'rw', null));
+  avifPhotos();
 
   // phones: do not re-measure every trigger each time the browser's bars slide in or out
   ScrollTrigger.config({ ignoreMobileResize: true });
@@ -350,6 +352,7 @@ export async function bootInnerPage(extra) {
   initCommon();
   await Promise.race([document.fonts.ready, wait(2000)]);
   if (extra) await extra();
+  avifPhotos();          // (rows built by the page itself)
   setupHScroll();
   setupCurves();
   setupReveals();
