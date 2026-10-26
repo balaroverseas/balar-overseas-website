@@ -305,6 +305,17 @@ export function setupFooter() {
   if (map) drawDotMap(map, { gap: 9, dot: 3, color: '#dadada', markers: [{ lat: 21.17, lon: 72.83, color: '#3b2cff' }, { lat: 23.13, lon: 113.26, color: '#3b2cff' }] }).catch(() => {});
   const pts = $('#footParticles');
   if (pts) particleText(pts, 'BALAROVERSEAS');
+  // back to the top of this page, from the footer of every page
+  const legal = $('.f-legal');
+  if (legal && !$('.f-up')) {
+    // a round badge: "back to top" turning around a blue core, the arrow flies off and comes back on hover
+    legal.insertAdjacentHTML('beforeend', `<button class="f-up" type="button" aria-label="Back to top">
+      <svg class="f-up-ring" viewBox="0 0 100 100" aria-hidden="true"><defs><path id="fUpPath" d="M50 50m-39 0a39 39 0 1 1 78 0a39 39 0 1 1-78 0"/></defs>
+        <text><textPath href="#fUpPath" textLength="244">&#160;BACK TO TOP&#160;&#160;•&#160;&#160;BACK TO TOP&#160;&#160;•&#160;</textPath></text></svg>
+      <span class="f-up-core" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" transform="translate(.5 0)" fill="currentColor"/></svg></span>
+    </button>`);
+    $('.f-up').addEventListener('click', () => (window.lenis ? window.lenis.scrollTo(0, { duration: 1.6 }) : scrollTo({ top: 0, behavior: 'smooth' })));
+  }
   setupSocialProof();
 }
 

@@ -435,7 +435,7 @@ footer{background:#fff;padding-top:3vw;overflow:hidden}
 .f-social{display:flex;gap:18px;margin-top:30px;font-size:13px}
 .f-social a{text-decoration:underline}
 #footMap{width:100%;aspect-ratio:2/1}
-.f-legal{display:flex;justify-content:space-between;gap:20px;border-top:1px solid var(--line);padding:18px 0;font-size:10px}
+.f-legal{display:flex;justify-content:space-between;align-items:center;gap:20px;border-top:1px solid var(--line);padding:18px 0;font-size:10px}
 .f-links{display:flex;gap:24px;flex-wrap:wrap;font-size:10px;padding-bottom:30px}
 /* licence credits for the third-party 3D models (CREDITS.md) */
 .f-credits{margin:-18px 0 0;padding-bottom:24px;font-size:9px;line-height:1.6;opacity:.55;max-width:900px}
@@ -1046,3 +1046,19 @@ footer{padding-top:6vw}
   .intro{background:linear-gradient(180deg,rgba(255,255,255,0) 0,#fff 55vh,#fff calc(100% - 23.4vw),rgba(255,255,255,0) calc(100% - 23.4vw))}
   .journey{margin-top:-23.4vw;height:1564vh}      /* 1632vh less the 0.68 screen of standing still taken out in main.js */
 }
+
+/* ---------- footer: back to top (a round badge, text turning around a blue core) ---------- */
+.f-up{position:relative;width:92px;height:92px;flex:none;border-radius:50%;cursor:pointer;color:#111;-webkit-tap-highlight-color:transparent}
+.f-up-ring{position:absolute;inset:0;width:100%;height:100%;animation:fUpSpin 14s linear infinite}
+.f-up-ring text{font-family:var(--mono);font-size:9.6px;letter-spacing:.12em;fill:currentColor}
+.f-up-core{position:absolute;inset:22px;border-radius:50%;display:grid;place-items:center;overflow:hidden;color:#fff;
+  background:radial-gradient(circle at 30% 25%,#8f86ff 0%,#3b2cff 55%,#1d128f 100%);box-shadow:0 10px 24px -8px rgba(59,44,255,.7),inset 0 0 0 1px rgba(255,255,255,.25);transition:transform .4s cubic-bezier(.2,.7,.2,1)}
+.f-up-core svg{width:28px;height:28px}
+.f-up:hover .f-up-ring,.f-up:focus-visible .f-up-ring{animation-duration:4s}
+.f-up:hover .f-up-core{transform:scale(1.08)}
+.f-up:hover .f-up-core svg,.f-up:focus-visible .f-up-core svg{animation:fUpFly .9s cubic-bezier(.6,0,.2,1) infinite}
+.f-up:active .f-up-core{transform:scale(.94)}
+@keyframes fUpSpin{to{transform:rotate(360deg)}}
+@keyframes fUpFly{0%{transform:translateY(0)}45%{transform:translateY(-34px)}46%{transform:translateY(34px)}100%{transform:translateY(0)}}
+@media (prefers-reduced-motion:reduce){.f-up-ring,.f-up:hover .f-up-core svg{animation:none}}
+@media (max-width:759px){.f-up{width:78px;height:78px}.f-up-core{inset:19px}}
