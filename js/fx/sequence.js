@@ -42,21 +42,29 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', avif = false,
   // frames around the current one are decoded ahead of time and held as bitmaps (a few each side,
   // more in the direction of travel); the ones left behind are released.
   const bitmaps = new Map(), pending = new Set();
-  let dirSign = 1, lastW = 0, noBitmaps = false;
+  let dirSign = 1, noBitmaps = false, speed = 0, lastT = 0, settle = 0;
+  // the frames held: a window around the current one, longer ahead. Scrolled fast, a phone cannot decode
+  // every frame before the page is past it, so the window then takes every st-th frame and reaches
+  // as far ahead: there is always a decoded frame close to where the page is going (see near). Slower,
+  // st falls back to 1 and the frames in between are filled in.
+  const win = () => {
+    const st = warp ? 1 : Math.max(1, Math.round(speed * 3));
+    const ahead = cache * 2 * st, back = Math.ceil(cache / 2) * st;
+    return dirSign > 0 ? [current - back, current + ahead, st] : [current - ahead, current + back, st];
+  };
   const hold = (i) => {
     if (noBitmaps || i < from || i >= count || bitmaps.has(i) || pending.has(i) || !frames[i] || !window.createImageBitmap) return;
     if (pending.size >= 2) return;     // two at a time (each one finished asks for the next, see below)
     pending.add(i);
-    // (a frame larger than it is drawn is decoded straight to the drawn size: less memory, and the same
-    // pixels on screen)
-    const im = frames[i], tw = Math.ceil(lastW);
-    const opt = tw > 0 && tw < im.width ? { resizeWidth: tw, resizeHeight: Math.round((tw * im.height) / im.width), resizeQuality: 'high' } : undefined;
     // (made from the file's bytes - already in the browser's cache - not from the <img>: from an <img>
     // the bitmap is made on the page's own thread, 16-40 ms a frame even on a fast PC, and six at once
-    // froze the page as the ship came in; from the bytes it is decoded in the background)
-    fetch(im.src).then((r) => r.blob()).then((blob) => (opt ? createImageBitmap(blob, opt) : createImageBitmap(blob))).then((b) => {
+    // froze the page as the ship came in; from the bytes it is decoded in the background. Kept at the
+    // frame's own size: shrinking the 2560 px desktop frames to the screen as they were decoded cost
+    // more than it saved, and made the stacker and the ship's start stutter)
+    fetch(frames[i].src).then((r) => r.blob()).then((blob) => createImageBitmap(blob)).then((b) => {
       pending.delete(i);
-      if (Math.abs(i - current) > cache * 2 + 2) { b.close(); tend(); return; }
+      const [a, z] = win();
+      if (i < a - 2 || i > z + 2) { b.close(); tend(); return; }
       bitmaps.set(i, b);
       if (i === current || i === current + 1) draw();
       tend();
@@ -64,12 +72,25 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', avif = false,
   };
   const tend = () => {
     if (!cache) return;
-    const a = current - (dirSign > 0 ? Math.ceil(cache / 2) : cache * 2), b = current + (dirSign > 0 ? cache * 2 : Math.ceil(cache / 2));
-    for (let i = current; i <= b; i++) hold(i);
-    for (let i = current - 1; i >= a; i--) hold(i);
+    const [a, b, st] = win();
+    for (let i = current; i >= a && i <= b; i += dirSign * st) hold(i);
+    for (let i = current - dirSign * st; i >= a && i <= b; i -= dirSign * st) hold(i);
     bitmaps.forEach((bm, i) => { if (i < a - 2 || i > b + 2) { bm.close(); bitmaps.delete(i); } });
   };
-  const pic = (i) => bitmaps.get(i) || frames[i];
+  // A frame not decoded yet would be decoded the moment it is drawn, on the spot - on a phone that is
+  // the stutter (scrolled fast, a phone's stacker asks for 100+ new frames a second, far more than it
+  // can decode). So until it is ready the nearest frame that is decoded stands in for it (a few frames
+  // off at most); when the scroll slows the right one arrives. Not where each frame is drawn from its
+  // own camera (warp): there a stand-in would sit in the wrong place.
+  const near = (i) => {
+    const [a, b] = win();
+    for (let d = 1; d <= b - a; d++) {
+      const a = bitmaps.get(i - d * dirSign) || bitmaps.get(i + d * dirSign);
+      if (a) return a;
+    }
+    return null;
+  };
+  const pic = (i) => bitmaps.get(i) || (cache && !warp && near(i)) || frames[i];
 
   function resize() {
     dpr = Math.min(devicePixelRatio || 1, 2);
@@ -101,7 +122,6 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', avif = false,
       x = ax + (x - ax) * v.s + v.dx; y = ay + (y - ay) * v.s + v.dy; w *= v.s; h *= v.s;
       clipW = v.clip ? w * v.clip : 0;
     }
-    lastW = w * dpr;
     if (shadow) {
       // soft drop shadow from the frame's own alpha (e.g. the jet over the page)
       g.save();
@@ -189,6 +209,14 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', avif = false,
       const fr = blend ? f - i : 0;
       if (i === current && Math.abs(fr - frac) < 0.004) return;
       if (i !== current) dirSign = i > current ? 1 : -1;
+      // how fast the frames are going by (frames per call, smoothed; a pause in the scroll resets it)
+      const now = performance.now();
+      speed = now - lastT > 150 ? 0 : speed * 0.8 + Math.abs(i - current) * 0.2;
+      lastT = now;
+      // once the scroll stops, every frame around the page is decoded again (the right one replaces its
+      // stand-in as soon as it is ready)
+      clearTimeout(settle);
+      settle = setTimeout(() => { speed = 0; tend(); }, 160);
       current = i; frac = fr;
       tend();
       if (!frames[i]) load(i);

@@ -258,6 +258,10 @@ function setupJourney(journey, port) {
       if (port) port.setProgress(Math.min(1, P / P_PORT));
       const seqOn = mob && mobNew && !MOB_SEQ ? 0 : 1 - range(P, P_PORT - 0.015, P_PORT);
       if (MOB_SEQ) { jCanvas.style.opacity = seqOn >= 1 ? 0 : 1; journey && journey.pause(seqOn >= 1); }   // the frames are see-through: no live scene behind them
+      // desktop: while the frames cover the screen the live scene behind them does not show (not one pixel
+      // changes without it), but drawing it every frame made the whole stacker stretch stutter: it rests
+      // until the frames start to fade
+      if (!mob) journey && journey.pause(seqOn >= 1);
       seqWrap.style.opacity = seqOn;
       seqWrap.style.visibility = seqOn > 0 ? 'visible' : 'hidden';
       giant.style.opacity = range(P, 0.44, 0.48) - range(P, 0.69, 0.71);
