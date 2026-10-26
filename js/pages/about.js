@@ -1,5 +1,6 @@
 import { $, $$, range, bootInnerPage } from '../common.js';
 import { drawDotMap } from '../fx/dotmap.js';
+import { routeGlobe } from '../fx/routeglobe.js';
 
 const { gsap, ScrollTrigger } = window;
 
@@ -61,6 +62,7 @@ function faqTabs() {
 bootInnerPage(async () => {
   hero();
   difference();
+  routeGlobe($('#diffGlobe'), { phone: matchMedia('(max-width:759px)').matches }).catch(() => {});
   faqTabs();
   drawDotMap($('#tradeMap'), {
     gap: 8, dot: 2.6, color: 'rgba(255,255,255,.45)', flicker: true,

@@ -53,7 +53,7 @@ function renderRows() {
         <span class="mono why">Why choose us</span>
         <ul>${bullets.map((b) => `<li>${b}</li>`).join('')}</ul>
       </div>
-      <img src="${IMG}${img}" alt="${title}" loading="lazy">
+      <figure class="ind-fig"><img src="${IMG}${img}" alt="${title}" loading="lazy"></figure>
     </article>`).join('');
 }
 
