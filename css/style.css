@@ -1061,4 +1061,5 @@ footer{padding-top:6vw}
 @keyframes fUpSpin{to{transform:rotate(360deg)}}
 @keyframes fUpFly{0%{transform:translateY(0)}45%{transform:translateY(-34px)}46%{transform:translateY(34px)}100%{transform:translateY(0)}}
 @media (prefers-reduced-motion:reduce){.f-up-ring,.f-up:hover .f-up-core svg{animation:none}}
-@media (max-width:759px){.f-up{width:78px;height:78px}.f-up-core{inset:19px}}
+/* phones: on the left, clear of the fixed WhatsApp button in the bottom right corner */
+@media (max-width:759px){.f-up{width:78px;height:78px;order:-1}.f-up-core{inset:19px}}
