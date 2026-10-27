@@ -47,7 +47,7 @@ if (!location.hash) scrollTo(0, 0);
 const pt = document.createElement('div');
 pt.className = 'pt';
 pt.setAttribute('aria-hidden', 'true');
-pt.innerHTML = `<div class="pt-panel"><img src="${LOGO}" alt=""><span class="mono">Balar Overseas</span></div>`;
+pt.innerHTML = `<div class="pt-panel"><span class="tm-box"><img src="${LOGO}" alt=""><sup class="tm" aria-hidden="true">TM</sup></span><span class="mono">Balar Overseas</span></div>`;
 document.body.append(pt);
 const ptPanel = pt.querySelector('.pt-panel');
 const arriving = sessionStorage.getItem('bo-pt') === '1';

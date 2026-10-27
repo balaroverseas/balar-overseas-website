@@ -51,7 +51,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .pl-brand{font-family:var(--display);font-stretch:125%;font-weight:700;letter-spacing:.04em;font-size:14px;white-space:nowrap}
 /* first loader: the full logo (mark + name); between the rings: the mark alone, large */
 img.pl-brand{display:block;width:auto;height:54px}
-img.pl-page-logo{height:clamp(130px,15vmax,230px)}
+.pl-page-logo img{display:block;width:auto;height:clamp(130px,15vmax,230px)}
 .pl-home{position:absolute;inset:0;background:#000;display:grid;grid-template-columns:1fr minmax(280px,606px) 1fr;align-items:center;gap:24px;padding:0 var(--pad)}
 .pl-col{position:relative}
 .pl-rise{position:absolute;left:0;bottom:50%;margin-bottom:28px;opacity:0}
@@ -931,7 +931,7 @@ footer{padding-top:6vw}
 .paint{color:transparent;-webkit-text-fill-color:transparent;-webkit-background-clip:text;background-clip:text;background-repeat:no-repeat;
   background-image:linear-gradient(90deg,var(--pc,#fff) calc(var(--g,130)*1% - 30%),var(--accent) calc(var(--g,130)*1% - 3%),rgba(59,44,255,0) calc(var(--g,130)*1%));
   background-size:var(--lw,100%) 100%;background-position:calc(-1*var(--wx,0px)) 0}
-@media (max-width:759px){img.pl-page-logo{height:64px}}
+@media (max-width:759px){.pl-page-logo img{height:64px}}
 
 /* ---------- Phones: industries as a compact two-column grid (every card kept, about a third of the
    scrolling): the two feature cards run full width with the picture on the right, the rest sit two a row ---------- */
@@ -1063,3 +1063,15 @@ footer{padding-top:6vw}
 @media (prefers-reduced-motion:reduce){.f-up-ring,.f-up:hover .f-up-core svg{animation:none}}
 /* phones: on the left, clear of the fixed WhatsApp button in the bottom right corner */
 @media (max-width:759px){.f-up{width:78px;height:78px;order:-1}.f-up-core{inset:19px}}
+
+/* ---------- trademark: a small TM at the top right of the logo, wherever the logo is shown ----------
+   --lh is the height of the logo it belongs to (the TM is a fixed share of it); the parent is positioned,
+   and the TM sits just past the logo's right edge, level with its top. */
+.tm{position:absolute;left:100%;top:0;margin-left:.2em;font-family:var(--body);font-weight:700;font-size:max(6.5px,calc(var(--lh,52px) * .17));line-height:1;letter-spacing:.02em;color:#fff;pointer-events:none;transition:color .4s;-webkit-text-fill-color:currentColor}
+.site-head .logo{--lh:52px}
+.site-head[data-theme="light"] .tm{color:#111}
+.tm-box{position:relative;display:inline-block;--lh:54px}
+.pl-rise{--lh:54px}
+.pl-page-logo{--lh:clamp(130px,15vmax,230px)}
+@media (max-width:759px){.pl-rise{--lh:8vw}.pl-page-logo{--lh:64px}}
+@media (max-width:759px){.site-head .logo{--lh:29px}}
