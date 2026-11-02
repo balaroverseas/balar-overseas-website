@@ -463,10 +463,14 @@ const shipY = (f) => { const y = -16 + 48 * shipSm(f, 1, 75); return y + (6 - y)
 const shipT = (i) => 1 + (i * 199) / 99;
 const shipX = (f) => -0.15 * (1 - shipSm(f, 1, 40));
 const shipWarp = (pos, j) => {
-  const F = shipT(pos), fj = Math.round(shipT(j)), zF = shipZ(F), ppm = 2560 / (0.75 * zF);
+  const F = shipT(pos), fj = Math.round(shipT(j)), zF = shipZ(F), ppm = SHIP_PX / (0.75 * zF);   // (SHIP_PX: the frames' own width, see below)
   return { m: shipZ(fj) / zF, dy: (shipY(F) - shipY(fj)) * ppm, dx: (shipX(fj) - shipX(F)) * ppm };
 };
 const SHIP_PHONE = matchMedia('(max-width:759px)').matches;
+// upright phones draw seq/ship_m (cut from the 2560 px render, same scale); every other screen seq/ship, the
+// render at 1600 px: the 2560 px frames took a slow computer 60-480 ms each to open while scrolling (see sequence.js)
+const SHIP_DIR = SHIP_PHONE && innerWidth / innerHeight <= 0.6 ? 'seq/ship_m' : 'seq/ship';
+const SHIP_PX = SHIP_DIR === 'seq/ship_m' ? 2560 : 1600;
 let SHIP_IN = 1;      // phones: 0 as the ship comes in under the truck -> 1 once it is over it (see the ship player's view)
 const MOB_SEQ = !QS.has('live') && matchMedia('(max-width:759px)').matches;
 async function boot() {
@@ -514,7 +518,7 @@ async function boot() {
       // phones show only the last 40 frames (see PACE in setupShip): the earlier ones are not fetched, and
       // on an upright screen the frames come from seq/ship_m - the same frames cut to their middle
       // 1000 px, which is all such a screen can show (a wider phone-width window keeps the full ones)
-      dir: SHIP_PHONE && innerWidth / innerHeight <= 0.6 ? 'seq/ship_m' : 'seq/ship', from: SHIP_PHONE ? 60 : 0,
+      dir: SHIP_DIR, from: SHIP_PHONE ? 60 : 0,
       // (every screen: the ship is drawn from each frame's own camera, so it glides between the 100
       // frames instead of stepping from one to the next every ~70 px of scroll)
       count: 100, fit: 'cover', lazy: true, blend: true, warp: shipWarp, cache: SHIP_PHONE ? 5 : 4,

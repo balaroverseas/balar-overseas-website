@@ -54,7 +54,7 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', avif = false,
   };
   const hold = (i) => {
     if (noBitmaps || i < from || i >= count || bitmaps.has(i) || pending.has(i) || !frames[i] || !window.createImageBitmap) return;
-    if (pending.size >= 2) return;     // two at a time (each one finished asks for the next, see below)
+    if (pending.size >= 6) return;     // six at a time (each one finished asks for the next, see below)
     pending.add(i);
     // (made from the file's bytes - already in the browser's cache - not from the <img>: from an <img>
     // the bitmap is made on the page's own thread, 16-40 ms a frame even on a fast PC, and six at once
