@@ -1,0 +1,36 @@
+# Keeps data/social.json in step with the Instagram account, so the follower count on the site
+# follows the real one without anyone editing the page.
+#
+# One-time setup (repo → Settings → Secrets and variables → Actions → New repository secret):
+#   IG_TOKEN – the long-lived access token Meta's app dashboard generates for the Instagram
+#              professional account ("API setup with Instagram login" → Generate token)
+# The token lasts about 60 days; each run asks Meta to extend it. If a run fails (token expired or
+# revoked) the site simply keeps showing the last saved number until a new token is saved.
+name: Instagram follower count
+on:
+  schedule:
+    - cron: "17 */6 * * *"      # four times a day
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read the count and save it
+        env:
+          IG_TOKEN: ${{ secrets.IG_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${IG_TOKEN:-}" ]; then echo "IG_TOKEN secret not set"; exit 1; fi
+          curl -fsS "https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=${IG_TOKEN}" > /dev/null || echo "token not extended this run"
+          n=$(curl -fsS "https://graph.instagram.com/me?fields=followers_count&access_token=${IG_TOKEN}" | jq -r '.followers_count // empty')
+          case "$n" in ''|*[!0-9]*) echo "no count returned"; exit 1;; esac
+          jq --argjson n "$n" --arg d "$(date -u +%F)" '.instagram.followers = $n | .instagram.updated = $d' data/social.json > social.tmp
+          mv social.tmp data/social.json
+          if git diff --quiet data/social.json; then echo "unchanged ($n)"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Instagram followers: $n" data/social.json
+          git push
