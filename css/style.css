@@ -1075,3 +1075,7 @@ footer{padding-top:6vw}
 .pl-page-logo{--lh:clamp(130px,15vmax,230px)}
 @media (max-width:759px){.pl-rise{--lh:8vw}.pl-page-logo{--lh:64px}}
 @media (max-width:759px){.site-head .logo{--lh:29px}}
+
+/* ---------- footer: the business's registered name, GSTIN and IEC ---------- */
+.f-reg{display:flex;flex-wrap:wrap;gap:4px 24px;font-size:10px;padding:2px 0 14px;color:#555}
+@media (max-width:759px){.f-reg{gap:4px 16px;padding-bottom:10px}}
