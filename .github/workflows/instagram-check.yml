@@ -1,0 +1,19 @@
+# One-off check: asks Instagram why it refuses the IG_TOKEN secret and prints the answer as a note
+# (never the token itself - GitHub hides the secret in logs, and only its first 4 characters and its
+# length are shown).
+name: Instagram check
+on:
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ask Instagram about the token
+        env:
+          IG_TOKEN: ${{ secrets.IG_TOKEN }}
+        run: |
+          echo "::notice::token starts with ${IG_TOKEN:0:4}, length ${#IG_TOKEN}, stray spaces or line breaks: $(printf %s "$IG_TOKEN" | tr -d '[:graph:]' | wc -c)"
+          code=$(curl -sS -o body.json -w '%{http_code}' "https://graph.instagram.com/me?fields=user_id,username,followers_count&access_token=${IG_TOKEN}" || true)
+          echo "::notice::graph.instagram.com answered HTTP ${code}: $(jq -c . body.json 2>/dev/null | cut -c1-400)"
+          code=$(curl -sS -o body2.json -w '%{http_code}' "https://graph.facebook.com/v21.0/me?access_token=${IG_TOKEN}" || true)
+          echo "::notice::graph.facebook.com answered HTTP ${code}: $(jq -c . body2.json 2>/dev/null | cut -c1-400)"
