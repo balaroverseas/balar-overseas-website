@@ -1079,3 +1079,11 @@ footer{padding-top:6vw}
 /* ---------- footer: the business's registered name, GSTIN and IEC ---------- */
 .f-reg{display:flex;flex-wrap:wrap;gap:4px 24px;font-size:10px;padding:2px 0 14px;color:#555}
 @media (max-width:759px){.f-reg{gap:4px 16px;padding-bottom:10px}}
+
+/* iPhone (iOS 26+): the pinned full-screen scenes follow the live visible height (dvh, like the reference),
+   so nothing coloured shows in the gap under them when the Safari bar changes size. Scroll maths still uses svh. */
+@supports (height:100dvh){
+  .hero-sticky,.journey-sticky,.ship-sticky,.vmo-sticky,.road-sticky{height:100dvh}
+  .plane-stage{height:100dvh;margin-bottom:-100dvh}
+  .ship{margin-top:-100dvh}
+}
