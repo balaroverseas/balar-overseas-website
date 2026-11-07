@@ -504,7 +504,8 @@ async function boot() {
   await Promise.race([document.fonts.ready, wait(2500)]);
   const [globe, journey, port, ship] = await Promise.all([
     scene('globe', './scenes/globe.js', 'initGlobe', $('#globe'), $('#globeLabels'), { fadeOnScroll: true }),
-    scene('journey', './scenes/journey.js', 'initJourney', $('#journeyCanvas'), (v) => { $('#jSpeed').textContent = String(v).padStart(2, '0'); }),
+    // (phones draw none of it any more - stacker and road are frames - so it is not even loaded; ?cap keeps it for capture_road.py)
+    MOB_SEQ && !QS.has('cap') ? Promise.resolve(null) : scene('journey', './scenes/journey.js', 'initJourney', $('#journeyCanvas'), (v) => { $('#jSpeed').textContent = String(v).padStart(2, '0'); }),
     // port phase: Cycles render of the stacker loading the truck
     // (?mob on a phone: the phone staging's own portrait frames, rendered through the live phone camera at
     // 375x812 - drawn across the width, with the ground line / box centre kept where that camera puts them
