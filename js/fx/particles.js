@@ -4,12 +4,18 @@
 // own ease and friction, before they settle back. The canvas is larger than the wordmark's box
 // (1.5× wide, 3× tall) so scattered dots are not cut off at its edges.
 export function particleText(canvas, text = 'BALAROVERSEAS', opts = {}) {
-  const { color = '#a0a0a0', gap = 4, size = 2 } = opts;
+  const { color = '#a0a0a0', gap = 4, size = 2, hover = '#3b2cff' } = opts;   // hover: the dots turn this colour while the pointer (or a finger) is on the word
   const host = canvas.parentElement;
   const g = canvas.getContext('2d');
   let parts = [], W = 0, H = 0, CW = 0, CH = 0, dpr = 1;
   const R2 = 3000, R = Math.sqrt(R2);
   const mouse = { x: -1e4, y: -1e4, on: false, timer: 0 };
+  // colour: the dots keep `color`; over the word they ease to `hover` (and back), all together
+  const rgb = (c) => { const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(c.trim()); if (!m) return null; let h = m[1]; if (h.length === 3) h = h.replace(/./g, '$&$&'); return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)); };
+  const c0 = rgb(color), c1 = rgb(hover);
+  let hv = 0, hvTarget = 0, hvTimer = 0;
+  const overWord = (x, y) => { const r = host.getBoundingClientRect(); return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; };
+  const touchHold = (e) => { const t = e.touches && e.touches[0]; hvTarget = t && overWord(t.clientX, t.clientY) ? 1 : 0; clearTimeout(hvTimer); };
 
   Object.assign(canvas.style, { position: 'absolute', left: '-25%', top: '-100%', width: '150%', height: '300%', inset: 'auto', pointerEvents: 'none' });
   canvas.style.left = '-25%';
@@ -61,7 +67,14 @@ export function particleText(canvas, text = 'BALAROVERSEAS', opts = {}) {
     mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top; mouse.on = true;
     clearTimeout(mouse.timer);
     mouse.timer = setTimeout(() => { mouse.on = false; }, 100);
+    hvTarget = overWord(e.clientX, e.clientY) ? 1 : 0;
   });
+  document.documentElement.addEventListener('mouseleave', () => { hvTarget = 0; });
+  addEventListener('touchstart', touchHold, { passive: true });
+  addEventListener('touchmove', touchHold, { passive: true });
+  const touchEnd = () => { clearTimeout(hvTimer); hvTimer = setTimeout(() => { hvTarget = 0; }, 700); };      // a finger lifted: the colour stays a moment, then goes back
+  addEventListener('touchend', touchEnd, { passive: true });
+  addEventListener('touchcancel', touchEnd, { passive: true });
 
   let visible = false;
   new IntersectionObserver(([e]) => { visible = e.isIntersecting; }).observe(host);
@@ -70,7 +83,12 @@ export function particleText(canvas, text = 'BALAROVERSEAS', opts = {}) {
     requestAnimationFrame(frame);
     if (!visible || !parts.length) return;
     g.clearRect(0, 0, CW, CH);
-    g.fillStyle = color;
+    hv += (hvTarget - hv) * 0.14;
+    if (Math.abs(hv - hvTarget) < 0.004) hv = hvTarget;
+    if (c0 && c1) {
+      const fill = hv === 0 ? color : `rgb(${c0.map((v, i) => Math.round(v + (c1[i] - v) * hv)).join(',')})`;
+      g.fillStyle = fill;
+    } else g.fillStyle = color;
     g.beginPath();
     const r = size / 2, TAU = Math.PI * 2;
     for (const p of parts) {

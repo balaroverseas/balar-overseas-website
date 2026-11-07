@@ -311,6 +311,8 @@ function setupJourney(journey, port) {
           }
           giant.style.opacity = 1;
           giant.style.transform = `translate(${(15 - Math.min(1299, Math.max(0, d / k - 199))) * k}px,${-Math.max(0, d - 1573 * k)}px)`;
+          // once it has left the top it is taken out altogether: a phone kept redrawing this huge faint word out of sight
+          const gone = d - 1573 * k > H ? '1' : ''; if (gone !== (giant.dataset.gone || '')) { giant.dataset.gone = gone; giant.style.display = gone ? 'none' : ''; }
           jCanvas.style.transform = rel.style.transform = '';
           rel.style.opacity = 1;
           col.style.transform = `translateY(${H - (d - 1478 * k)}px)`;
