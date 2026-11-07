@@ -417,6 +417,8 @@ function setupShip(ship) {
 function setupPlane() {
   const sec = $('#testimonials'), wrap = $('.plane-stage .jet-wrap'), sh = $('.plane-stage .jet-shadow');
   if (!sec || !wrap) return;
+  // phones: the shadow is blurred and faint - a 640 px copy does for it (the full 2560 px one was decoded a second time while scrolling)
+  if (sh && matchMedia('(max-width:759px)').matches) sh.src = 'seq/plane/jet_s.webp';
   // y of cubic-bezier(.25,.1,.25,1) at x = t
   const ease = (t) => {
     if (t <= 0) return 0;

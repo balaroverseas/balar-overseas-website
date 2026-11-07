@@ -91,12 +91,18 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', avif = false,
     return null;
   };
   const pic = (i) => bitmaps.get(i) || (cache && !warp && near(i)) || frames[i];
+  // (cache players, phones) A frame that has no decoded bitmap yet would be decoded the moment it is painted
+  // (~100 ms for a ship frame): the picture already on the canvas stays until the bitmap arrives (it redraws then)
+  const isBm = (v) => typeof ImageBitmap !== 'undefined' && v instanceof ImageBitmap;
+  let drawnOnce = false;
+  const keepOld = !!cache && matchMedia('(max-width:759px)').matches;      // phones only
 
   function resize() {
     dpr = Math.min(devicePixelRatio || 1, 2);
     W = canvas.clientWidth; H = canvas.clientHeight;
     if (!W || !H) return;
     canvas.width = W * dpr; canvas.height = H * dpr;
+    drawnOnce = false;      // (the resize cleared it)
     draw();
   }
 
@@ -104,6 +110,7 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', avif = false,
     const at = nearest(current), img = at < 0 ? null : frames[at];
     if (!img || !W) return;
     const src = pic(at);
+    if (keepOld && !noBitmaps && drawnOnce && !isBm(src)) return;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, W, H);
     // 'contain' may crop up to `bleed` of the width on narrow screens so the subject stays large
@@ -136,7 +143,8 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', avif = false,
     // camera would see it from the in-between position - enlarged and shifted - and this one, shrunk
     // the same way, fades out over it: the motion is continuous and the two never stand apart.
     // Without it the next frame is simply laid over this one by the fraction of the way to it.
-    const next = blend && at === current && frames[current + 1] ? pic(current + 1) : null;
+    let next = blend && at === current && frames[current + 1] ? pic(current + 1) : null;
+    if (next && keepOld && !noBitmaps && drawnOnce && !isBm(next)) next = null;
     if (next && warp) {
       const k = w / img.width, cx = x + w / 2, cy = y + h / 2, pos = current + frac;
       const vN = warp(pos, current + 1), vC = warp(pos, current);
@@ -162,6 +170,7 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', avif = false,
       // below a frame that stops short of the bottom: carry its last row on down (ground or road)
       g.drawImage(src, 0, src.height - 2, src.width, 1, x, y + h - 1, w, H - (y + h) + 2);
     }
+    drawnOnce = true;
     onLayout && onLayout({ x, y, w, h, W, H, frame: current });
   }
 
