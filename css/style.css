@@ -209,6 +209,8 @@ img.pl-brand{display:block;width:auto;height:54px}
 .journey{position:relative;height:1632vh;background:#fff}
 .journey-sticky{position:sticky;top:0;height:100vh;height:100svh;overflow:hidden}
 #journeyCanvas{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:1}
+/* phones: the road scene as pre-rendered frames (seq/road_ms), the left strip only (424 of the 750 px of the capture) */
+#roadSeq{position:absolute;left:0;top:0;width:56.53%;height:100%;display:none;z-index:1;pointer-events:none}
 /* pre-rendered Blender stacker sequence; black ground band like the reference */
 .j-seq{position:absolute;inset:0;z-index:2;pointer-events:none}
 .j-ground{position:absolute;left:0;right:0;bottom:0;height:var(--gh,22%);background:#0b0b0d}

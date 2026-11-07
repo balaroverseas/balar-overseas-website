@@ -191,6 +191,24 @@ function setupJourney(journey, port) {
   if (ground) ground.style.display = 'none';      // the road is in the render
   const jCanvas = $('#journeyCanvas');
   jCanvas.style.opacity = 1;
+  // Phones: from where the stacker frames end, the road scene (truck on its road, then the join with the
+  // ship) is a second set of frames too (seq/road_ms: the live scene captured at 375x812, 3 px of scroll
+  // apart; _export/record/capture_road.py), so nothing is drawn live on a phone. Frame i was captured at
+  // x px of scroll from the top of the section (375 px wide): 2030 + 3i for i < 724, then 4230 + 30j
+  // (only the box paint moves), then 5162 + 3m through the join, then 5800.
+  const roadCv = MOB_SEQ ? $('#roadSeq') : null;
+  const ROAD_N = 957, ROAD_E = 5134;      // frames; E (see below) the capture was made with
+  const road = roadCv ? (roadCv.style.display = 'block', sequencePlayer(roadCv, {
+    dir: 'seq/road_ms', count: ROAD_N, fit: 'width', cache: 12, lazy: true,
+    // the live camera keeps the truck at a fixed share of the screen height (27% down, mid-screen once the join
+    // zooms out); the frames are slid so that holds on any phone shape
+    view: ({ h, H, frame }) => {
+      const m = frame - 755, u = range(m, 0, 200);
+      return { s: 1, dx: 0, dy: (0.27 + 0.23 * u * u * (3 - 2 * u) - 0.5) * (H - h) };
+    },
+  })) : null;
+  const roadFrame = (xc) => (xc <= 4199 ? Math.max(0, (xc - 2030) / 3) : xc < 4230 ? 723 + (xc - 4199) / 31 : xc <= 5130 ? 724 + (xc - 4230) / 30
+    : xc < 5162 ? 754 + (xc - 5130) / 32 : xc <= 5762 ? 755 + (xc - 5162) / 3 : Math.min(ROAD_N - 1, 955 + (xc - 5762) / 38));
   let cardsMax = 0;
   const measure = () => { cardsMax = Math.max(0, cards.scrollWidth - innerWidth + 40); };
   measure();
@@ -257,7 +275,16 @@ function setupJourney(journey, port) {
       journey && journey.setProgress(P);
       if (port) port.setProgress(Math.min(1, P / P_PORT));
       const seqOn = mob && mobNew && !MOB_SEQ ? 0 : 1 - range(P, P_PORT - 0.015, P_PORT);
-      if (MOB_SEQ) { jCanvas.style.opacity = seqOn >= 1 ? 0 : 1; journey && journey.pause(seqOn >= 1); }   // the frames are see-through: no live scene behind them
+      if (MOB_SEQ) {
+        // nothing of the 3-D scene is drawn on a phone any more: the road frames take over from the stacker frames
+        jCanvas.style.opacity = 0; journey && journey.pause(true);
+        roadCv.style.opacity = seqOn >= 1 ? 0 : 1;
+        const span = sec.offsetHeight - 2 * H, k = K(), xr = (raw * span) / k;
+        if (xr > 600) road.load();
+        const Er = (1478 * k + H + col.offsetHeight) / k;      // where the text column has just left the top (the capture's was ROAD_E)
+        const xc = xr <= 4200 ? xr : xr < Er + 28 ? 4200 + ((xr - 4200) / (Er + 28 - 4200)) * (5162 - 4200) : 5162 + (xr - (Er + 28));
+        road.setProgress(roadFrame(xc) / (ROAD_N - 1));
+      }
       // desktop: while the frames cover the screen the live scene behind them does not show (not one pixel
       // changes without it), but drawing it every frame made the whole stacker stretch stutter: it rests
       // until the frames start to fade
