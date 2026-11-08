@@ -305,6 +305,23 @@ export function setupFooter() {
   if (map) drawDotMap(map, { gap: 9, dot: 3, color: '#dadada', markers: [{ lat: 21.17, lon: 72.83, color: '#3b2cff' }, { lat: 23.13, lon: 113.26, color: '#3b2cff' }] }).catch(() => {});
   const pts = $('#footParticles');
   if (pts) particleText(pts, 'BALAROVERSEAS');
+  // the round WhatsApp button fades away as the dotted wordmark comes in at the page's end (it sat on the last letters) and is back as soon as the page is scrolled up
+  const wa = $('.wa');
+  if (wa && pts) {
+    const host = pts.parentElement;
+    let raf = 0;
+    const lift = () => {
+      raf = 0;
+      const o = Math.max(0, innerHeight - host.getBoundingClientRect().top) / Math.max(1, host.offsetHeight);      // 0 = wordmark not in view yet, 1 = all of it
+      const v = Math.min(1, Math.max(0, 1 - o * 2.5));
+      wa.style.opacity = v < 1 ? v.toFixed(2) : '';
+      wa.style.pointerEvents = v < 0.3 ? 'none' : '';
+    };
+    const ask = () => { if (!raf) raf = requestAnimationFrame(lift); };
+    addEventListener('scroll', ask, { passive: true });
+    addEventListener('resize', ask);
+    ask();
+  }
   // back to the top of this page, from the footer of every page
   const legal = $('.f-legal');
   if (legal && !$('.f-up')) {
