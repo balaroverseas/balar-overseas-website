@@ -20,6 +20,6 @@ setInterval(() => {
   frames = [];
   const top = worst.slice().sort((a, b) => b[0] - a[0]).slice(0, 4).map((w) => `${w[0]}ms@y${w[1]}`).join('  ');
   const st = window.__seqStats || {};
-  const lines = Object.keys(st).map((k) => { const s = st[k]; return `${k.replace('seq/', '')}: bm ${s.bm} avg ${s.bm ? Math.round(s.bmMs / s.bm) : 0}ms max ${Math.round(s.bmMax)}ms held ${s.stale}`; });
+  const lines = Object.keys(st).map((k) => { const s = st[k]; return `${k.replace('seq/', '')}: bm ${s.bm} avg ${s.bm ? Math.round(s.bmMs / s.bm) : 0}ms max ${Math.round(s.bmMax)}ms held ${s.stale} | draw max ${Math.round(s.drMax)}ms@y${s.drY} resize ${s.rs}x max ${Math.round(s.rsMax)}ms`; });
   box.textContent = `fps ${avg ? Math.round(1000 / avg) : 0}  slow ${slow}/${n}  y ${Math.round(scrollY)}\nworst: ${top || '-'}\n${lines.join('\n')}`;
 }, 500);

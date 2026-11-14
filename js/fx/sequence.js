@@ -98,18 +98,26 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', avif = false,
   const isBm = (v) => typeof ImageBitmap !== 'undefined' && v instanceof ImageBitmap;
   let drawnOnce = false;
   const keepOld = !!cache && matchMedia('(max-width:759px)').matches;      // phones only
-  const stats = ((window.__seqStats = window.__seqStats || {})[dir] = { bm: 0, bmMs: 0, bmMax: 0, stale: 0, draws: 0 });      // read by the ?perf overlay
+  const stats = ((window.__seqStats = window.__seqStats || {})[dir] = { bm: 0, bmMs: 0, bmMax: 0, stale: 0, draws: 0, drMax: 0, drY: 0, rs: 0, rsMax: 0 });      // read by the ?perf overlay
 
   function resize() {
     dpr = Math.min(devicePixelRatio || 1, 2);
     W = canvas.clientWidth; H = canvas.clientHeight;
     if (!W || !H) return;
+    const tr = performance.now();
     canvas.width = W * dpr; canvas.height = H * dpr;
     drawnOnce = false;      // (the resize cleared it)
     draw();
+    { const d = performance.now() - tr; stats.rs++; if (d > stats.rsMax) stats.rsMax = d; }
   }
 
   function draw() {
+    const td = performance.now();
+    drawIt();
+    const d = performance.now() - td;
+    if (d > stats.drMax) { stats.drMax = d; stats.drY = Math.round(scrollY); }
+  }
+  function drawIt() {
     const at = nearest(current), img = at < 0 ? null : frames[at];
     if (!img || !W) return;
     const src = pic(at);
