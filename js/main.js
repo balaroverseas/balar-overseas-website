@@ -503,6 +503,7 @@ const SHIP_PHONE = matchMedia('(max-width:759px)').matches;
 const SHIP_DIR = SHIP_PHONE && innerWidth / innerHeight <= 0.6 ? 'seq/ship_m' : 'seq/ship';
 const SHIP_PX = SHIP_DIR === 'seq/ship_m' ? 2560 : 1600;
 let SHIP_IN = 1;      // phones: 0 as the ship comes in under the truck -> 1 once it is over it (see the ship player's view)
+if (QS.has('perf')) import('./dev/perf-overlay.js');      // ?perf: a small fps / stall readout for checking a real phone
 const MOB_SEQ = !QS.has('live') && matchMedia('(max-width:759px)').matches;
 async function boot() {
   await Promise.race([document.fonts.ready, wait(2500)]);

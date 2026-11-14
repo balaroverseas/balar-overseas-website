@@ -56,6 +56,7 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', avif = false,
     if (noBitmaps || i < from || i >= count || bitmaps.has(i) || pending.has(i) || !frames[i] || !window.createImageBitmap) return;
     if (pending.size >= 6) return;     // six at a time (each one finished asks for the next, see below)
     pending.add(i);
+    const tb0 = performance.now();
     // (made from the file's bytes - already in the browser's cache - not from the <img>: from an <img>
     // the bitmap is made on the page's own thread, 16-40 ms a frame even on a fast PC, and six at once
     // froze the page as the ship came in; from the bytes it is decoded in the background. Kept at the
@@ -63,6 +64,7 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', avif = false,
     // more than it saved, and made the stacker and the ship's start stutter)
     fetch(frames[i].src).then((r) => r.blob()).then((blob) => createImageBitmap(blob)).then((b) => {
       pending.delete(i);
+      { const d = performance.now() - tb0; stats.bm++; stats.bmMs += d; if (d > stats.bmMax) stats.bmMax = d; }
       const [a, z] = win();
       if (i < a - 2 || i > z + 2) { b.close(); tend(); return; }
       bitmaps.set(i, b);
@@ -96,6 +98,7 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', avif = false,
   const isBm = (v) => typeof ImageBitmap !== 'undefined' && v instanceof ImageBitmap;
   let drawnOnce = false;
   const keepOld = !!cache && matchMedia('(max-width:759px)').matches;      // phones only
+  const stats = ((window.__seqStats = window.__seqStats || {})[dir] = { bm: 0, bmMs: 0, bmMax: 0, stale: 0, draws: 0 });      // read by the ?perf overlay
 
   function resize() {
     dpr = Math.min(devicePixelRatio || 1, 2);
@@ -110,7 +113,7 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', avif = false,
     const at = nearest(current), img = at < 0 ? null : frames[at];
     if (!img || !W) return;
     const src = pic(at);
-    if (keepOld && !noBitmaps && drawnOnce && !isBm(src)) return;
+    if (keepOld && !noBitmaps && drawnOnce && !isBm(src)) { stats.stale++; return; }
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, W, H);
     // 'contain' may crop up to `bleed` of the width on narrow screens so the subject stays large
@@ -170,7 +173,7 @@ export function sequencePlayer(canvas, { dir, count, ext = 'webp', avif = false,
       // below a frame that stops short of the bottom: carry its last row on down (ground or road)
       g.drawImage(src, 0, src.height - 2, src.width, 1, x, y + h - 1, w, H - (y + h) + 2);
     }
-    drawnOnce = true;
+    drawnOnce = true; stats.draws++;
     onLayout && onLayout({ x, y, w, h, W, H, frame: current });
   }
 
